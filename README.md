@@ -1,172 +1,197 @@
-# MIDI keyboard real-time player
+# live-midi-player
 
-Проект слушает MIDI-клавиатуру и воспроизводит звук в реальном времени.
+`live-midi-player` — MIDI live player для Windows: слушает MIDI-клавиатуру и сразу отправляет ноты в выбранный синтезатор. Подходит для игры в реальном времени, переключения инструментов на лету и быстрых живых сетапов.
 
-Поддерживаются два движка:
+**Коротко о проекте:**
+- live-воспроизведение MIDI без DAW в минимальном окружении;
+- два движка: `midi-out` (рекомендуется) и `fluidsynth`;
+- быстрое переключение инструментов (`Program Change`, Bank Select);
+- избранные инструменты (до 20 позиций) и горячие клавиши;
+- сохранение MIDI-портов в JSON-конфиг.
 
-- `midi-out` (рекомендуется): отправка MIDI в DAW/VST для лучшего качества звука.
-- `fluidsynth`: автономный вариант через SoundFont (`.sf2`) внутри Python.
+![MIDI Live Player — main screen](res/scr/midi-live-player-main.png)
 
-## Быстрый старт
+## Возможности
 
-1. Установка зависимостей:
+- **Два режима воспроизведения:**  
+  `midi-out` для отправки MIDI во внешний синт (DAW/VST/устройство) и `fluidsynth` для standalone работы через SoundFont (`.sf2`).
+- **Live-управление инструментами:**  
+  смена `program`/`bank` в реальном времени с логами и GM-именами.
+- **Избранные инструменты:**  
+  отдельный файл `midi_favorites.json`, быстрый выбор из списка.
+- **Сохранение портов:**  
+  текущие `input/output` сохраняются в `midi_ports.json`.
+- **CLI + batch-скрипты:**  
+  готовые команды для установки, настройки, запуска и тестов на Windows.
+
+## Требования
+
+- Windows 10/11
+- Python 3.10+ (рекомендуется 3.11+)
+- MIDI input-устройство (клавиатура/контроллер)
+- (опционально) DAW/VST или внешний MIDI-синтезатор
+- (опционально) SoundFont `.sf2` для режима `fluidsynth`
+
+Зависимости из `requirements.txt`:
+- `mido`
+- `python-rtmidi`
+- `pyfluidsynth`
+
+## Быстрый старт (Windows)
+
+1) Установить зависимости и создать виртуальное окружение:
 
 ```bat
 install.bat
 ```
 
-2. Активация окружения:
+2) Активировать окружение:
 
 ```bat
-.venv\Scripts\activate
+act.bat
 ```
 
-3. Настройка портов (основной сценарий):
+3) Настроить MIDI-порты:
 
 ```bat
 configure_ports.bat
 ```
 
-4. Запуск плеера с текущими сохраненными настройками:
+![Настройка MIDI портов](res/scr/midi-live-player-config.png)
+
+4) Запустить плеер:
 
 ```bat
 python main.py
 ```
 
-## Где хранятся выбранные порты
+Быстрый запуск из скрипта:
 
-Текущие `input/output` сохраняются в файле:
+```bat
+start_midi.bat
+```
 
-- `midi_ports.json`
+## Управление во время игры
 
-Приоритет выбора портов:
+Горячие клавиши в консоли:
+- `+` / `=` — следующий инструмент (`Program +1`)
+- `-` / `_` — предыдущий инструмент (`Program -1`)
+- `F1..F10` — избранные инструменты `1..10`
+- `Shift+F1..Shift+F10` — избранные инструменты `11..20`
+- `*` — добавить/удалить текущий инструмент в избранном
+- `PgUp` / `PgDown` — навигация по избранным
+- `p` / `P` — показать список избранных
+- `h` / `H` — показать подсказку по клавишам
 
-1. Явные CLI-параметры `--input-port` / `--output-port`
-2. Значения из `midi_ports.json`
-3. Первый доступный порт из системы (fallback)
+Дополнительно можно переключать инструменты по MIDI CC:
+- `--program-up-cc <0..127>`
+- `--program-down-cc <0..127>`
 
-## configure_ports.bat
+Файл избранных по умолчанию: `midi_favorites.json` (можно переопределить через `--favorites`).
 
-### Интерактивное меню (основной кейс)
+## Настройка портов
 
-Запуск без параметров:
+Порты можно настраивать интерактивно и через аргументы:
 
 ```bat
 configure_ports.bat
-```
-
-В меню доступны действия:
-
-- показать сохраненные настройки;
-- показать текущие MIDI порты;
-- изменить input/output;
-- запуск `main.py`.
-
-### Параметризованные команды
-
-Показать сохраненные настройки:
-
-```bat
 configure_ports.bat show-config
-```
-
-Показать текущие доступные порты:
-
-```bat
 configure_ports.bat list-ports
-```
-
-Сохранить новый input/output:
-
-```bat
 configure_ports.bat set --input-port "LKMK3 MIDI 0" --output-port "Microsoft GS Wavetable Synth 0"
-```
-
-Поддерживается частичное обновление:
-
-```bat
-configure_ports.bat set --input-port "LKMK3 MIDI 0"
-```
-
-Запустить программу с дополнительными аргументами:
-
-```bat
 configure_ports.bat run --engine midi-out
 ```
 
-## Команды main.py
+Приоритет выбора портов:
+1. CLI-параметры `--input-port` / `--output-port`
+2. значения из `midi_ports.json`
+3. первый доступный системный порт (fallback)
 
-Список портов:
+## CLI примеры (`main.py`)
+
+Показать доступные порты:
 
 ```bat
 python main.py --list-ports
+python main.py --list-ports-json
+python main.py --list-ports-json --ports-kind input
 ```
 
-Показать сохраненный конфиг:
+Работа с конфигом портов:
 
 ```bat
 python main.py --show-config
-```
-
-Сохранить порты в конфиг:
-
-```bat
 python main.py --set-config --input-port "LKMK3 MIDI 0" --output-port "Microsoft GS Wavetable Synth 0"
+python main.py --save-ports --engine midi-out --input-port "LKMK3 MIDI 0" --output-port "Microsoft GS Wavetable Synth 0"
 ```
 
-Запуск с лучшим качеством (через MIDI Out):
+Запуск через `midi-out` (рекомендуется):
 
 ```bat
 python main.py --engine midi-out
-```
-
-Пример для конкретных портов:
-
-```bat
 python main.py --engine midi-out --input-port "LKMK3 MIDI 0" --output-port "Microsoft GS Wavetable Synth 0"
 ```
 
-Standalone через FluidSynth:
+Запуск через `fluidsynth`:
 
 ```bat
 python main.py --engine fluidsynth --soundfont "D:\SoundFonts\piano.sf2" --audio-driver wasapi --sample-rate 48000 --buffer 64
 ```
 
-## Проверка гипотезы: mido + python-rtmidi (live)
+Полезные опции:
+- `--channel`, `--program`, `--bank`
+- `--audio-driver`, `--sample-rate`, `--buffer`, `--latency-target-ms`
+- `--config` (путь к файлу портов), `--favorites` (путь к файлу избранных)
+- `--verbose` (печатать входящие MIDI-сообщения)
 
-Цель проверки: убедиться, что смена инструмента (`program_change`) действительно применяется в живом потоке и слышимо меняет тембр на стороне внешнего синта/DAW.
+## Проверка live `Program Change`
 
-1. Запусти слушатель в verbose-режиме:
+1. Запустите в verbose-режиме:
 
 ```bat
 python main.py --engine midi-out --verbose
 ```
 
-2. В DAW/контроллере отправь в одном сеансе:
-   - `program_change` для Piano (например, program `0`);
-   - сыграй несколько нот;
-   - `program_change` для Organ (например, program `16`);
-   - снова сыграй несколько нот;
-   - `program_change` для Strings (например, program `48`);
-   - снова сыграй несколько нот.
+2. Отправьте последовательность: `ProgramChange` -> несколько нот -> новый `ProgramChange` -> снова ноты.
+3. Если устройство использует Bank Select, отправляйте `CC0` -> `CC32` -> `ProgramChange`.
 
-3. Если устройство использует Bank Select, отправляй последовательность:
-   - `CC0` (Bank MSB) -> `CC32` (Bank LSB) -> `ProgramChange`.
+Ожидаемые признаки:
+- логи `[instrument]` при изменении bank/program;
+- логи `[play]` на `note_on` с актуальным `program/bank`;
+- слышимое изменение тембра на внешнем синте.
 
-Ожидаемые признаки в консоли:
-- строки `[instrument] ... cc0/cc32 ...` при смене банка;
-- строка `[instrument] ... program=... bank=...` при смене программы;
-- строки `[play] ... program=... bank=...` на входящих `note_on`, чтобы сопоставить игру с активным тембром.
+## Тесты
 
-Критерий успеха:
-- логи фиксируют смену программы без ошибок;
-- тембр слышимо меняется после `program_change`.
+Запуск всех тестов:
 
-Важно: итоговый звук определяется внешним синтом/плагином (DAW/VST/устройство). `mido + python-rtmidi` только корректно передает MIDI-сообщения.
+```bat
+run_tests.bat
+```
 
-## Рекомендации по задержке
+Запуск конкретного теста:
 
-- Используй ASIO или WASAPI exclusive.
-- Buffer: `64-128` samples.
-- Sample rate: `48000` Hz.
-- `Microsoft GS Wavetable Synth` часто дает заметную задержку; для более живого отклика лучше DAW/VST или tuned FluidSynth.
+```bat
+run_tests.bat tests/test_program_names.py
+run_tests.bat tests/test_program_names.py::test_gm_program_name_hit
+```
+
+## Структура проекта
+
+```text
+.
+├─ main.py
+├─ requirements.txt
+├─ install.bat
+├─ configure_ports.bat
+├─ start_MIDI.bat
+├─ run_tests.bat
+├─ midi_ports.json
+├─ midi_favorites.json
+├─ tests/
+└─ res/scr/
+```
+
+## Notes
+
+- Проект ориентирован на Windows (используются консольные hotkeys через `msvcrt`).
+- Для минимальной задержки в live-сценариях предпочтителен `midi-out` + DAW/VST с ASIO/WASAPI exclusive.
+- `Microsoft GS Wavetable Synth` удобен для проверки, но часто даёт заметную задержку.
