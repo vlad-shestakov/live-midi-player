@@ -1,4 +1,4 @@
 {
-  "input_port": "LKMK3 MIDI 0",
+  "input_port": "LKMK3 MIDI 1",
   "output_port": "Microsoft GS Wavetable Synth 0"
 }
