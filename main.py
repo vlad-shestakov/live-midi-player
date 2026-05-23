@@ -1,10 +1,11 @@
 ﻿from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
 import json
 import time
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import Iterable, Literal, Optional
 
 import mido
 
@@ -14,11 +15,25 @@ except ImportError:
     msvcrt = None
 
 CONFIG_FILENAME = "midi_ports.json"
+FAVORITES_FILENAME = "midi_favorites.json"
 PROGRAM_RANGE = 128
 
 
 def wrap_program(program: int) -> int:
     return program % PROGRAM_RANGE
+
+
+@dataclass(frozen=True)
+class KeyboardAction:
+    kind: Literal[
+        "program_step",
+        "favorite_toggle",
+        "favorite_prev",
+        "favorite_next",
+        "print_favorites",
+        "print_help",
+    ]
+    step: int = 0
 
 
 class ProgramController:
@@ -45,6 +60,11 @@ class ProgramController:
             return wrap_program(program)
         return 0
 
+    def current_program(self, channel: Optional[int] = None) -> int:
+        target_channel = self.last_active_channel if channel is None else channel
+        channel_state = self._ensure_channel_state(target_channel)
+        return self._current_program(channel_state)
+
     def sync_from_message(self, msg: mido.Message) -> None:
         channel = getattr(msg, "channel", self._default_channel)
         channel_state = self._ensure_channel_state(channel)
@@ -64,9 +84,14 @@ class ProgramController:
 
     def change_program(self, step: int, source: str, channel: Optional[int] = None) -> None:
         target_channel = self.last_active_channel if channel is None else channel
+        old_program = self.current_program(target_channel)
+        self.set_program(old_program + step, source=source, channel=target_channel)
+
+    def set_program(self, program: int, source: str, channel: Optional[int] = None) -> None:
+        target_channel = self.last_active_channel if channel is None else channel
         channel_state = self._ensure_channel_state(target_channel)
         old_program = self._current_program(channel_state)
-        new_program = wrap_program(old_program + step)
+        new_program = wrap_program(program)
         channel_state["program"] = new_program
         self._engine.program_change(new_program, target_channel)
         print(
@@ -77,22 +102,32 @@ class ProgramController:
         )
 
 
-def poll_program_step_from_keyboard() -> int:
+def poll_keyboard_actions() -> list[KeyboardAction]:
     if msvcrt is None:
-        return 0
+        return []
 
-    step = 0
+    actions: list[KeyboardAction] = []
     while msvcrt.kbhit():
         key = msvcrt.getwch()
         if key in ("\x00", "\xe0"):
             if msvcrt.kbhit():
-                msvcrt.getwch()
+                extended_key = msvcrt.getwch()
+                if extended_key == "I":
+                    actions.append(KeyboardAction(kind="favorite_next"))
+                elif extended_key == "Q":
+                    actions.append(KeyboardAction(kind="favorite_prev"))
             continue
         if key in ("+", "="):
-            step += 1
+            actions.append(KeyboardAction(kind="program_step", step=1))
         elif key in ("-", "_"):
-            step -= 1
-    return step
+            actions.append(KeyboardAction(kind="program_step", step=-1))
+        elif key == "*":
+            actions.append(KeyboardAction(kind="favorite_toggle"))
+        elif key in ("p", "P", "з", "З"):
+            actions.append(KeyboardAction(kind="print_favorites"))
+        elif key in ("h", "H", "р", "Р"):
+            actions.append(KeyboardAction(kind="print_help"))
+    return actions
 
 
 class AudioEngine:
@@ -208,6 +243,130 @@ class FluidSynthEngine(AudioEngine):
 
 def default_config_path() -> Path:
     return Path(__file__).resolve().parent / CONFIG_FILENAME
+
+
+def default_favorites_path() -> Path:
+    return Path(__file__).resolve().parent / FAVORITES_FILENAME
+
+
+def _normalize_favorites(programs: Iterable[object]) -> list[int]:
+    normalized: list[int] = []
+    for value in programs:
+        if not isinstance(value, int) or not 0 <= value < PROGRAM_RANGE:
+            continue
+        if value not in normalized:
+            normalized.append(value)
+    return normalized
+
+
+def load_favorites(favorites_path: Path) -> list[int]:
+    if not favorites_path.exists():
+        return []
+
+    try:
+        with favorites_path.open("r", encoding="utf-8") as favorites_file:
+            raw = json.load(favorites_file)
+    except json.JSONDecodeError:
+        print(
+            f"Предупреждение: некорректный JSON избранных ({favorites_path}). "
+            "Используется пустой список."
+        )
+        return []
+
+    if not isinstance(raw, dict):
+        print(
+            f"Предупреждение: формат избранных ({favorites_path}) не распознан. "
+            "Используется пустой список."
+        )
+        return []
+
+    programs = raw.get("programs")
+    if not isinstance(programs, list):
+        print(
+            f"Предупреждение: в избранных ({favorites_path}) нет списка 'programs'. "
+            "Используется пустой список."
+        )
+        return []
+
+    return _normalize_favorites(programs)
+
+
+def save_favorites(favorites_path: Path, programs: Iterable[int]) -> None:
+    payload = {"schema_version": 1, "programs": _normalize_favorites(programs)}
+    with favorites_path.open("w", encoding="utf-8") as favorites_file:
+        json.dump(payload, favorites_file, ensure_ascii=False, indent=2)
+        favorites_file.write("\n")
+
+
+def toggle_favorite(
+    favorites: list[int], program: int, last_favorite_index: Optional[int]
+) -> tuple[bool, Optional[int]]:
+    if program in favorites:
+        removed_index = favorites.index(program)
+        favorites.pop(removed_index)
+        if last_favorite_index is None:
+            return False, None
+        if last_favorite_index == removed_index:
+            return False, None
+        if last_favorite_index > removed_index:
+            return False, last_favorite_index - 1
+        return False, last_favorite_index
+
+    favorites.append(program)
+    return True, last_favorite_index
+
+
+def _favorite_target_index(
+    favorites: list[int],
+    current_program: int,
+    last_favorite_index: Optional[int],
+    direction: int,
+) -> int:
+    if not favorites:
+        raise ValueError("favorites list is empty")
+
+    if last_favorite_index is not None and 0 <= last_favorite_index < len(favorites):
+        return (last_favorite_index + direction) % len(favorites)
+
+    if current_program in favorites:
+        base_index = favorites.index(current_program)
+        return (base_index + direction) % len(favorites)
+
+    return 0 if direction > 0 else len(favorites) - 1
+
+
+def favorite_next(
+    favorites: list[int], current_program: int, last_favorite_index: Optional[int]
+) -> tuple[int, int]:
+    index = _favorite_target_index(favorites, current_program, last_favorite_index, 1)
+    return favorites[index], index
+
+
+def favorite_prev(
+    favorites: list[int], current_program: int, last_favorite_index: Optional[int]
+) -> tuple[int, int]:
+    index = _favorite_target_index(favorites, current_program, last_favorite_index, -1)
+    return favorites[index], index
+
+
+def print_favorites(programs: list[int]) -> None:
+    if not programs:
+        print("Избранные программы: <пусто>")
+        return
+    joined = ", ".join(str(program) for program in programs)
+    print(f"Избранные программы ({len(programs)}): {joined}")
+
+
+def print_hotkeys() -> None:
+    print("Быстрые клавиши:")
+    print("  + или = : Program +1")
+    print("  - или _ : Program -1")
+    print("  *       : Добавить/удалить текущую программу в избранном")
+    print("  PgUp    : Следующая избранная программа (по списку)")
+    print("  PgDown  : Предыдущая избранная программа (по списку)")
+    print("  p/P/з/З : Показать список избранных программ")
+    print("  h/H/р/Р : Показать список быстрых клавиш")
+    print("  Ctrl+C  : Остановить программу")
 
 
 def load_port_config(config_path: Path) -> dict[str, Optional[str]]:
@@ -347,6 +506,11 @@ def parse_args() -> argparse.Namespace:
         "--config",
         default=str(default_config_path()),
         help="Путь к JSON-файлу конфигурации MIDI-портов.",
+    )
+    parser.add_argument(
+        "--favorites",
+        default=str(default_favorites_path()),
+        help="Путь к JSON-файлу избранных программ.",
     )
     parser.add_argument(
         "--input-port",
@@ -565,6 +729,7 @@ def log_instrument_observability(
 
 def run(args: argparse.Namespace) -> None:
     config_path = Path(args.config)
+    favorites_path = Path(args.favorites)
 
     if args.list_ports:
         print_ports()
@@ -623,6 +788,8 @@ def run(args: argparse.Namespace) -> None:
         print(f"Выбранные порты сохранены в {config_path}")
 
     engine = build_engine(args, output_name)
+    favorites = load_favorites(favorites_path)
+    last_favorite_index: Optional[int] = None
     channel_state = build_channel_instrument_state()
     default_state = channel_state[args.channel]
     default_state["bank_msb"] = (args.bank >> 7) & 0x7F
@@ -647,7 +814,11 @@ def run(args: argparse.Namespace) -> None:
         f"Целевые параметры: buffer={args.buffer} сэмплов, "
         f"latency<={args.latency_target_ms:.1f} мс."
     )
-    print("Горячие клавиши: '+' или '=' для Program +1, '-' или '_' для Program -1.")
+    print(
+        "Горячие клавиши: +/= Program +1, -/_ Program -1, * toggle избранного, "
+        "PgUp/PgDown выбор по избранным, p/P/з/З список избранных, h/H/р/Р помощь."
+    )
+    print(f"Файл избранных: {favorites_path} (загружено: {len(favorites)})")
     print("Прослушивание MIDI... Нажмите Ctrl+C для остановки.")
 
     try:
@@ -676,12 +847,63 @@ def run(args: argparse.Namespace) -> None:
                         )
                         continue
                     handle_message(msg, engine, args.channel)
-                keyboard_step = poll_program_step_from_keyboard()
-                if keyboard_step != 0:
+                keyboard_actions = poll_keyboard_actions()
+                if keyboard_actions:
                     handled_any = True
-                    direction = 1 if keyboard_step > 0 else -1
-                    for _ in range(abs(keyboard_step)):
-                        program_controller.change_program(direction, source="keyboard")
+                for action in keyboard_actions:
+                    if action.kind == "program_step" and action.step != 0:
+                        program_controller.change_program(action.step, source="keyboard")
+                        continue
+
+                    if action.kind == "favorite_toggle":
+                        current_program = program_controller.current_program()
+                        added, last_favorite_index = toggle_favorite(
+                            favorites,
+                            current_program,
+                            last_favorite_index,
+                        )
+                        save_favorites(favorites_path, favorites)
+                        toggle_action = "добавлена в" if added else "удалена из"
+                        print(
+                            f"[favorites] program={current_program} {toggle_action} избранных"
+                        )
+                        continue
+
+                    if action.kind in ("favorite_prev", "favorite_next"):
+                        if not favorites:
+                            print("Нет избранных, добавьте в избранные через *")
+                            continue
+                        current_program = program_controller.current_program()
+                        if action.kind == "favorite_prev":
+                            favorite_program, last_favorite_index = favorite_prev(
+                                favorites,
+                                current_program,
+                                last_favorite_index,
+                            )
+                            source = "favorite_prev"
+                        else:
+                            favorite_program, last_favorite_index = favorite_next(
+                                favorites,
+                                current_program,
+                                last_favorite_index,
+                            )
+                            source = "favorite_next"
+                        program_controller.set_program(
+                            favorite_program,
+                            source=source,
+                        )
+                        print(
+                            f"[favorites] выбрана программа {favorite_program} "
+                            f"({last_favorite_index + 1}/{len(favorites)})"
+                        )
+                        continue
+
+                    if action.kind == "print_favorites":
+                        print_favorites(favorites)
+                        continue
+
+                    if action.kind == "print_help":
+                        print_hotkeys()
                 if not handled_any:
                     time.sleep(0.001)
     finally:
