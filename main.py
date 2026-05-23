@@ -17,6 +17,7 @@ except ImportError:
 CONFIG_FILENAME = "midi_ports.json"
 FAVORITES_FILENAME = "midi_favorites.json"
 PROGRAM_RANGE = 128
+PENDING_EXTENDED_KEY = False
 
 
 def wrap_program(program: int) -> int:
@@ -103,12 +104,21 @@ class ProgramController:
 
 
 def poll_keyboard_actions() -> list[KeyboardAction]:
+    global PENDING_EXTENDED_KEY
     if msvcrt is None:
         return []
 
     actions: list[KeyboardAction] = []
     while msvcrt.kbhit():
         key = msvcrt.getwch()
+        if PENDING_EXTENDED_KEY:
+            PENDING_EXTENDED_KEY = False
+            extended_key = key
+            if extended_key == "I":
+                actions.append(KeyboardAction(kind="favorite_next"))
+            elif extended_key == "Q":
+                actions.append(KeyboardAction(kind="favorite_prev"))
+            continue
         if key in ("\x00", "\xe0"):
             if msvcrt.kbhit():
                 extended_key = msvcrt.getwch()
@@ -116,6 +126,8 @@ def poll_keyboard_actions() -> list[KeyboardAction]:
                     actions.append(KeyboardAction(kind="favorite_next"))
                 elif extended_key == "Q":
                     actions.append(KeyboardAction(kind="favorite_prev"))
+            else:
+                PENDING_EXTENDED_KEY = True
             continue
         if key in ("+", "="):
             actions.append(KeyboardAction(kind="program_step", step=1))
