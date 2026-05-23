@@ -7,10 +7,10 @@ todos:
     status: completed
   - id: set-latency-target
     content: "Зафиксировать целевые аудио-настройки: ASIO/WASAPI, буфер 64-128, 48 kHz."
-    status: in_progress
+    status: completed
   - id: define-mvp
     content: "Определить MVP-поток: MIDI In -> обработка событий -> воспроизведение звука."
-    status: pending
+    status: completed
 isProject: false
 ---
 
