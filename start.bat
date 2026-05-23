@@ -24,4 +24,4 @@ if x%VENV_PATH:%CURRENT_DIR%=x%VENV_PATH%==x (
 ) 
 
 :: Запускаем сервер
-python -m "vladshestakovmax_bot.py"
+python "main.py"

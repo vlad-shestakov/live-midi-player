@@ -4,16 +4,16 @@ overview: Добавить хранение выбранных MIDI input/output
 todos:
   - id: design-config-format
     content: Определить формат и путь файла настроек MIDI-портов (JSON) и правила приоритетов CLI/config/fallback.
-    status: pending
+    status: completed
   - id: extend-main-with-config
     content: Добавить в main.py загрузку/валидацию/применение и опциональное сохранение выбранных портов.
-    status: pending
+    status: completed
   - id: add-configure-bat
     content: Создать configure_ports.bat с интерактивным меню (основной кейс) и параметризованными командами show-config/list-ports/set/run.
-    status: pending
+    status: completed
   - id: document-new-workflow
     content: Обновить README новым сценарием настройки и запуска через конфиг и батник.
-    status: pending
+    status: completed
 isProject: false
 ---
 

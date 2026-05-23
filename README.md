@@ -1,50 +1,140 @@
 # MIDI keyboard real-time player
 
-This project listens to a MIDI keyboard and plays sound in real time with two engines:
+Проект слушает MIDI-клавиатуру и воспроизводит звук в реальном времени.
 
-- `midi-out` (recommended): routes MIDI to your DAW/VST host for best sound quality.
-- `fluidsynth`: standalone playback via SoundFont (`.sf2`) inside Python.
+Поддерживаются два движка:
 
-## Setup
+- `midi-out` (рекомендуется): отправка MIDI в DAW/VST для лучшего качества звука.
+- `fluidsynth`: автономный вариант через SoundFont (`.sf2`) внутри Python.
 
-1. Create virtual environment and install dependencies:
-   - `install.bat`
-2. Activate environment:
-   - `.venv\Scripts\activate`
+## Быстрый старт
 
-## List MIDI ports
+1. Установка зависимостей:
 
-```bash
+```bat
+install.bat
+```
+
+2. Активация окружения:
+
+```bat
+.venv\Scripts\activate
+```
+
+3. Настройка портов (основной сценарий):
+
+```bat
+configure_ports.bat
+```
+
+4. Запуск плеера с текущими сохраненными настройками:
+
+```bat
+python main.py
+```
+
+## Где хранятся выбранные порты
+
+Текущие `input/output` сохраняются в файле:
+
+- `midi_ports.json`
+
+Приоритет выбора портов:
+
+1. Явные CLI-параметры `--input-port` / `--output-port`
+2. Значения из `midi_ports.json`
+3. Первый доступный порт из системы (fallback)
+
+## configure_ports.bat
+
+### Интерактивное меню (основной кейс)
+
+Запуск без параметров:
+
+```bat
+configure_ports.bat
+```
+
+В меню доступны действия:
+
+- показать сохраненные настройки;
+- показать текущие MIDI порты;
+- изменить input/output;
+- запуск `main.py`.
+
+### Параметризованные команды
+
+Показать сохраненные настройки:
+
+```bat
+configure_ports.bat show-config
+```
+
+Показать текущие доступные порты:
+
+```bat
+configure_ports.bat list-ports
+```
+
+Сохранить новый input/output:
+
+```bat
+configure_ports.bat set --input-port "LKMK3 MIDI 0" --output-port "Microsoft GS Wavetable Synth 0"
+```
+
+Поддерживается частичное обновление:
+
+```bat
+configure_ports.bat set --input-port "LKMK3 MIDI 0"
+```
+
+Запустить программу с дополнительными аргументами:
+
+```bat
+configure_ports.bat run --engine midi-out
+```
+
+## Команды main.py
+
+Список портов:
+
+```bat
 python main.py --list-ports
 ```
 
-## Run with best quality (DAW/VST workflow)
+Показать сохраненный конфиг:
 
-Use a virtual MIDI cable and open that port in your DAW (Reaper, Cantabile, etc.) with a high quality VST instrument.
-
-```bash
-python main.py --engine midi-out --input-port "YOUR_KEYBOARD_PORT" --output-port "YOUR_DAW_MIDI_IN"
+```bat
+python main.py --show-config
 ```
 
-## Run standalone with FluidSynth
+Сохранить порты в конфиг:
 
-```bash
-python main.py --engine fluidsynth --input-port "YOUR_KEYBOARD_PORT" --soundfont "D:\SoundFonts\piano.sf2"
+```bat
+python main.py --set-config --input-port "LKMK3 MIDI 0" --output-port "Microsoft GS Wavetable Synth 0"
 ```
 
-Optional FluidSynth tuning:
+Запуск с лучшим качеством (через MIDI Out):
 
-```bash
-python main.py --engine fluidsynth --input-port "YOUR_KEYBOARD_PORT" --soundfont "D:\SoundFonts\piano.sf2" --audio-driver wasapi --sample-rate 48000 --buffer 64
+```bat
+python main.py --engine midi-out
 ```
 
-## Low-latency targets
+Пример для конкретных портов:
 
-- Driver: ASIO or WASAPI exclusive mode.
+```bat
+python main.py --engine midi-out --input-port "LKMK3 MIDI 0" --output-port "Microsoft GS Wavetable Synth 0"
+```
+
+Standalone через FluidSynth:
+
+```bat
+python main.py --engine fluidsynth --soundfont "D:\SoundFonts\piano.sf2" --audio-driver wasapi --sample-rate 48000 --buffer 64
+```
+
+## Рекомендации по задержке
+
+- Используй ASIO или WASAPI exclusive.
 - Buffer: `64-128` samples.
 - Sample rate: `48000` Hz.
-- Keep extra processing in the MIDI loop minimal.
-
-## MVP data flow
-
-`MIDI keyboard -> python-rtmidi/mido input -> message handling -> selected engine -> audio output`
+- `Microsoft GS Wavetable Synth` часто дает заметную задержку; для более живого отклика лучше DAW/VST или tuned FluidSynth.

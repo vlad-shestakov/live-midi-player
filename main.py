@@ -1,11 +1,14 @@
 ﻿from __future__ import annotations
 
 import argparse
+import json
 import time
 from pathlib import Path
 from typing import Iterable, Optional
 
 import mido
+
+CONFIG_FILENAME = "midi_ports.json"
 
 
 class AudioEngine:
@@ -119,32 +122,90 @@ class FluidSynthEngine(AudioEngine):
         self._synth.delete()
 
 
+def default_config_path() -> Path:
+    return Path(__file__).resolve().parent / CONFIG_FILENAME
+
+
+def load_port_config(config_path: Path) -> dict[str, Optional[str]]:
+    if not config_path.exists():
+        return {"input_port": None, "output_port": None}
+
+    try:
+        with config_path.open("r", encoding="utf-8") as config_file:
+            raw = json.load(config_file)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"Invalid JSON in config file: {config_path}") from exc
+
+    input_port = raw.get("input_port")
+    output_port = raw.get("output_port")
+    return {
+        "input_port": input_port if isinstance(input_port, str) and input_port else None,
+        "output_port": output_port
+        if isinstance(output_port, str) and output_port
+        else None,
+    }
+
+
+def save_port_config(
+    config_path: Path,
+    input_port: Optional[str],
+    output_port: Optional[str],
+) -> None:
+    payload = {"input_port": input_port or "", "output_port": output_port or ""}
+    with config_path.open("w", encoding="utf-8") as config_file:
+        json.dump(payload, config_file, ensure_ascii=False, indent=2)
+        config_file.write("\n")
+
+
+def print_ports() -> tuple[list[str], list[str]]:
+    inputs = list(mido.get_input_names())
+    outputs = list(mido.get_output_names())
+
+    print("MIDI input ports:")
+    for idx, name in enumerate(inputs, start=1):
+        print(f"  {idx}. {name}")
+
+    print("\nMIDI output ports:")
+    for idx, name in enumerate(outputs, start=1):
+        print(f"  {idx}. {name}")
+
+    return inputs, outputs
+
+
 def resolve_port(
-    requested_name: Optional[str], available_ports: Iterable[str], label: str
+    cli_value: Optional[str],
+    config_value: Optional[str],
+    available_ports: Iterable[str],
+    label: str,
 ) -> str:
     ports = list(available_ports)
     if not ports:
         raise RuntimeError(f"No {label} ports found.")
 
-    if requested_name:
-        if requested_name not in ports:
+    if cli_value:
+        if cli_value not in ports:
             available = ", ".join(ports)
             raise RuntimeError(
-                f"{label} port '{requested_name}' not found. Available: {available}"
+                f"{label} port '{cli_value}' not found. Available: {available}"
             )
-        return requested_name
+        return cli_value
+
+    if config_value:
+        if config_value in ports:
+            return config_value
+        print(
+            f"Warning: saved {label} port '{config_value}' is unavailable. "
+            f"Using fallback '{ports[0]}'."
+        )
 
     return ports[0]
 
 
-def print_ports() -> None:
-    print("MIDI input ports:")
-    for idx, name in enumerate(mido.get_input_names(), start=1):
-        print(f"  {idx}. {name}")
-
-    print("\nMIDI output ports:")
-    for idx, name in enumerate(mido.get_output_names(), start=1):
-        print(f"  {idx}. {name}")
+def show_saved_config(config_path: Path) -> None:
+    config = load_port_config(config_path)
+    print(f"Config file: {config_path}")
+    print(f"Saved input port : {config.get('input_port') or '<not set>'}")
+    print(f"Saved output port: {config.get('output_port') or '<not set>'}")
 
 
 def parse_args() -> argparse.Namespace:
@@ -162,6 +223,21 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--list-ports", action="store_true", help="List MIDI ports and exit."
+    )
+    parser.add_argument(
+        "--show-config",
+        action="store_true",
+        help="Show saved input/output port config and exit.",
+    )
+    parser.add_argument(
+        "--set-config",
+        action="store_true",
+        help="Save --input-port and/or --output-port to config and exit.",
+    )
+    parser.add_argument(
+        "--config",
+        default=str(default_config_path()),
+        help="Path to MIDI port config JSON file.",
     )
     parser.add_argument(
         "--input-port",
@@ -199,12 +275,40 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--verbose", action="store_true", help="Print incoming MIDI messages."
     )
+    parser.add_argument(
+        "--save-ports",
+        action="store_true",
+        help="Persist resolved input/output ports to config before listening.",
+    )
     return parser.parse_args()
 
 
-def build_engine(args: argparse.Namespace) -> AudioEngine:
+def update_saved_config(args: argparse.Namespace, config_path: Path) -> None:
+    if not args.input_port and not args.output_port:
+        raise RuntimeError("Use --input-port and/or --output-port with --set-config.")
+
+    current = load_port_config(config_path)
+    input_names = list(mido.get_input_names())
+    output_names = list(mido.get_output_names())
+
+    new_input = current.get("input_port")
+    new_output = current.get("output_port")
+
+    if args.input_port:
+        new_input = resolve_port(args.input_port, None, input_names, "input")
+    if args.output_port:
+        new_output = resolve_port(args.output_port, None, output_names, "output")
+
+    save_port_config(config_path, new_input, new_output)
+    print(f"Saved config to {config_path}")
+    print(f"Current input port : {new_input or '<not set>'}")
+    print(f"Current output port: {new_output or '<not set>'}")
+
+
+def build_engine(args: argparse.Namespace, output_name: Optional[str]) -> AudioEngine:
     if args.engine == "midi-out":
-        output_name = resolve_port(args.output_port, mido.get_output_names(), "output")
+        if not output_name:
+            raise RuntimeError("Unable to resolve output port for engine midi-out.")
         print(f"Engine: MIDI out -> {output_name}")
         return MidiOutEngine(output_name)
 
@@ -257,17 +361,55 @@ def handle_message(msg: mido.Message, engine: AudioEngine, default_channel: int)
 
 
 def run(args: argparse.Namespace) -> None:
+    config_path = Path(args.config)
+
     if args.list_ports:
         print_ports()
+        return
+
+    if args.show_config:
+        show_saved_config(config_path)
+        return
+
+    if args.set_config:
+        update_saved_config(args, config_path)
         return
 
     if not 0 <= args.channel <= 15:
         raise RuntimeError("--channel must be in range 0..15")
 
-    input_name = resolve_port(args.input_port, mido.get_input_names(), "input")
-    engine = build_engine(args)
+    config = load_port_config(config_path)
+    input_names = list(mido.get_input_names())
+    input_name = resolve_port(
+        args.input_port,
+        config.get("input_port"),
+        input_names,
+        "input",
+    )
+
+    output_name: Optional[str] = None
+    if args.engine == "midi-out":
+        output_names = list(mido.get_output_names())
+        output_name = resolve_port(
+            args.output_port,
+            config.get("output_port"),
+            output_names,
+            "output",
+        )
+
+    if args.save_ports:
+        save_port_config(
+            config_path,
+            input_name,
+            output_name if args.engine == "midi-out" else config.get("output_port"),
+        )
+        print(f"Saved selected ports to {config_path}")
+
+    engine = build_engine(args, output_name)
 
     print(f"Input: {input_name}")
+    if output_name:
+        print(f"Output: {output_name}")
     print(
         "Recommended audio setup: ASIO or WASAPI exclusive, "
         "buffer 64-128 samples, sample rate 48000 Hz."
