@@ -19,13 +19,16 @@ class ProgramNameFormattingTests(unittest.TestCase):
     def test_format_program_with_name_uses_reference_marker(self) -> None:
         self.assertEqual(
             main.format_program_with_name(48, bank=0),
-            "48 (String Ensemble 1 [GM reference])",
+            (
+                f"48 ({main.ANSI_GREEN}String Ensemble 1{main.ANSI_RESET} "
+                "[GM reference])"
+            ),
         )
 
     def test_non_gm_bank_still_uses_gm_reference_fallback(self) -> None:
         self.assertEqual(
             main.format_program_with_name(16, bank=8192),
-            "16 (Drawbar Organ [GM reference])",
+            f"16 ({main.ANSI_GREEN}Drawbar Organ{main.ANSI_RESET} [GM reference])",
         )
 
     def test_out_of_range_program_formats_as_unknown(self) -> None:
@@ -39,15 +42,15 @@ class ProgramNameFormattingTests(unittest.TestCase):
         self.assertEqual(
             output.getvalue(),
             (
-                "Избранные программы (8):\n"
-                "  1. 127 (Gunshot [GM reference])\n"
-                "  2. 9 (Glockenspiel [GM reference])\n"
-                "  3. 19 (Church Organ [GM reference])\n"
-                "  4. 123 (Bird Tweet [GM reference])\n"
-                "  5. 114 (Steel Drums [GM reference])\n"
-                "  6. 0 (Acoustic Grand Piano [GM reference])\n"
-                "  7. 5 (Electric Piano 2 [GM reference])\n"
-                "  8. 13 (Xylophone [GM reference])\n"
+                f"{main.ANSI_YELLOW}Избранные программы{main.ANSI_RESET} (8):\n"
+                f"  1. 127 ({main.ANSI_GREEN}Gunshot{main.ANSI_RESET} [GM reference])\n"
+                f"  2. 9 ({main.ANSI_GREEN}Glockenspiel{main.ANSI_RESET} [GM reference])\n"
+                f"  3. 19 ({main.ANSI_GREEN}Church Organ{main.ANSI_RESET} [GM reference])\n"
+                f"  4. 123 ({main.ANSI_GREEN}Bird Tweet{main.ANSI_RESET} [GM reference])\n"
+                f"  5. 114 ({main.ANSI_GREEN}Steel Drums{main.ANSI_RESET} [GM reference])\n"
+                f"  6. 0 ({main.ANSI_GREEN}Acoustic Grand Piano{main.ANSI_RESET} [GM reference])\n"
+                f"  7. 5 ({main.ANSI_GREEN}Electric Piano 2{main.ANSI_RESET} [GM reference])\n"
+                f"  8. 13 ({main.ANSI_GREEN}Xylophone{main.ANSI_RESET} [GM reference])\n"
             ),
         )
 
@@ -78,7 +81,10 @@ class ProgramNameFormattingTests(unittest.TestCase):
 
         rendered = output.getvalue()
         self.assertIn(
-            "program=6->7 (Clavi [GM reference])",
+            (
+                "program=6->7 "
+                f"({main.ANSI_GREEN}Clavi{main.ANSI_RESET} [GM reference])"
+            ),
             rendered,
         )
         self.assertNotIn("Harpsichord", rendered)
@@ -86,7 +92,48 @@ class ProgramNameFormattingTests(unittest.TestCase):
     def test_format_favorite_selected_message_includes_full_name(self) -> None:
         self.assertEqual(
             main.format_favorite_selected_message(9, selected_index=2, total_favorites=8),
-            "[favorites] выбрана программа 9 (Glockenspiel [GM reference]) (2/8)",
+            (
+                "[favorites] выбрана программа 9 "
+                f"({main.ANSI_GREEN}Glockenspiel{main.ANSI_RESET} [GM reference]) (2/8)"
+            ),
+        )
+
+    def test_print_hotkeys_uses_colored_header_and_shortcuts(self) -> None:
+        output = StringIO()
+        with redirect_stdout(output):
+            main.print_hotkeys()
+
+        rendered = output.getvalue()
+        self.assertIn(
+            f"{main.ANSI_YELLOW}Быстрые клавиши:{main.ANSI_RESET}",
+            rendered,
+        )
+        self.assertIn(f"{main.ANSI_BLUE}+ или ={main.ANSI_RESET}", rendered)
+        self.assertIn(f"{main.ANSI_BLUE}- или _{main.ANSI_RESET}", rendered)
+        self.assertIn(f"{main.ANSI_BLUE}PgUp{main.ANSI_RESET}", rendered)
+        self.assertIn(f"{main.ANSI_BLUE}PgDown{main.ANSI_RESET}", rendered)
+        self.assertIn(f"{main.ANSI_BLUE}p/P{main.ANSI_RESET}", rendered)
+        self.assertIn(f"{main.ANSI_BLUE}h/H{main.ANSI_RESET}", rendered)
+        self.assertIn(f"{main.ANSI_BLUE}Ctrl+C{main.ANSI_RESET}", rendered)
+
+    def test_resolve_port_warning_prefix_is_red(self) -> None:
+        output = StringIO()
+        with redirect_stdout(output):
+            resolved = main.resolve_port(
+                cli_value=None,
+                config_value="LKMK3 MIDI 0",
+                available_ports=["DJM-450 0"],
+                label="входной",
+            )
+
+        self.assertEqual(resolved, "DJM-450 0")
+        self.assertEqual(
+            output.getvalue(),
+            (
+                f"{main.ANSI_RED}Предупреждение:{main.ANSI_RESET} "
+                "сохраненный порт (входной) 'LKMK3 MIDI 0' недоступен. "
+                "Используется резервный вариант 'DJM-450 0'.\n"
+            ),
         )
 
 

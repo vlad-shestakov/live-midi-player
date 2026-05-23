@@ -19,6 +19,12 @@ FAVORITES_FILENAME = "midi_favorites.json"
 PROGRAM_RANGE = 128
 PENDING_EXTENDED_KEY = False
 GM_REFERENCE_TAG = "[GM reference]"
+APP_VERSION = "1.03 (23.05.2026)"
+ANSI_RESET = "\033[0m"
+ANSI_GREEN = "\033[32m"
+ANSI_YELLOW = "\033[33m"
+ANSI_BLUE = "\033[34m"
+ANSI_RED = "\033[31m"
 GM_PROGRAM_NAMES: tuple[str, ...] = (
     "Acoustic Grand Piano",
     "Bright Acoustic Piano",
@@ -169,11 +175,16 @@ def resolve_instrument_name(program: int, bank: int) -> tuple[str, bool]:
     return name, True
 
 
+def colorize(text: str, color: str) -> str:
+    return f"{color}{text}{ANSI_RESET}"
+
+
 def format_program_with_name(program: int, bank: int) -> str:
     name, is_reference = resolve_instrument_name(program, bank)
+    rendered_name = colorize(name, ANSI_GREEN) if is_reference else name
     if is_reference:
-        return f"{program} ({name} {GM_REFERENCE_TAG})"
-    return f"{program} ({name})"
+        return f"{program} ({rendered_name} {GM_REFERENCE_TAG})"
+    return f"{program} ({rendered_name})"
 
 
 @dataclass(frozen=True)
@@ -433,14 +444,16 @@ def load_favorites(favorites_path: Path) -> list[int]:
             raw = json.load(favorites_file)
     except json.JSONDecodeError:
         print(
-            f"Предупреждение: некорректный JSON избранных ({favorites_path}). "
+            f"{colorize('Предупреждение:', ANSI_RED)} "
+            f"некорректный JSON избранных ({favorites_path}). "
             "Используется пустой список."
         )
         return []
 
     if not isinstance(raw, dict):
         print(
-            f"Предупреждение: формат избранных ({favorites_path}) не распознан. "
+            f"{colorize('Предупреждение:', ANSI_RED)} "
+            f"формат избранных ({favorites_path}) не распознан. "
             "Используется пустой список."
         )
         return []
@@ -448,7 +461,8 @@ def load_favorites(favorites_path: Path) -> list[int]:
     programs = raw.get("programs")
     if not isinstance(programs, list):
         print(
-            f"Предупреждение: в избранных ({favorites_path}) нет списка 'programs'. "
+            f"{colorize('Предупреждение:', ANSI_RED)} "
+            f"в избранных ({favorites_path}) нет списка 'programs'. "
             "Используется пустой список."
         )
         return []
@@ -515,10 +529,11 @@ def favorite_prev(
 
 
 def print_favorites(programs: list[int]) -> None:
+    favorites_title = colorize("Избранные программы", ANSI_YELLOW)
     if not programs:
-        print("Избранные программы: <пусто>")
+        print(f"{favorites_title}: <пусто>")
         return
-    print(f"Избранные программы ({len(programs)}):")
+    print(f"{favorites_title} ({len(programs)}):")
     for index, program in enumerate(programs, start=1):
         print(f"  {index}. {format_program_with_name(program, bank=0)}")
 
@@ -533,15 +548,24 @@ def format_favorite_selected_message(
 
 
 def print_hotkeys() -> None:
-    print("Быстрые клавиши:")
-    print("  + или = : Program +1")
-    print("  - или _ : Program -1")
-    print("  *       : Добавить/удалить текущую программу в избранном")
-    print("  PgUp    : Следующая избранная программа (по списку)")
-    print("  PgDown  : Предыдущая избранная программа (по списку)")
-    print("  p/P/з/З : Показать список избранных программ")
-    print("  h/H/р/Р : Показать список быстрых клавиш")
-    print("  Ctrl+C  : Остановить программу")
+    print(colorize("Быстрые клавиши:", ANSI_YELLOW))
+    print(f"  {colorize('+ или =', ANSI_BLUE)} : Program +1")
+    print(f"  {colorize('- или _', ANSI_BLUE)} : Program -1")
+    print(
+        f"  {colorize('*', ANSI_BLUE)}       : "
+        "Добавить/удалить текущую программу в избранном"
+    )
+    print(
+        f"  {colorize('PgUp', ANSI_BLUE)}    : "
+        "Следующая избранная программа (по списку)"
+    )
+    print(
+        f"  {colorize('PgDown', ANSI_BLUE)}  : "
+        "Предыдущая избранная программа (по списку)"
+    )
+    print(f"  {colorize('p/P', ANSI_BLUE)}     : Показать список избранных программ")
+    print(f"  {colorize('h/H', ANSI_BLUE)}     : Показать список быстрых клавиш")
+    print(f"  {colorize('Ctrl+C', ANSI_BLUE)}  : Остановить программу")
 
 
 def load_port_config(config_path: Path) -> dict[str, Optional[str]]:
@@ -627,7 +651,8 @@ def resolve_port(
         if config_value in ports:
             return config_value
         print(
-            f"Предупреждение: сохраненный порт ({label}) '{config_value}' недоступен. "
+            f"{colorize('Предупреждение:', ANSI_RED)} "
+            f"сохраненный порт ({label}) '{config_value}' недоступен. "
             f"Используется резервный вариант '{ports[0]}'."
         )
 
@@ -971,6 +996,7 @@ def run(args: argparse.Namespace) -> None:
         )
         print(f"Выбранные порты сохранены в {config_path}")
 
+    print(f"**MIDI синтезатор, версия {APP_VERSION}**")
     engine = build_engine(args, output_name)
     favorites = load_favorites(favorites_path)
     last_favorite_index: Optional[int] = None
@@ -999,11 +1025,15 @@ def run(args: argparse.Namespace) -> None:
         f"latency<={args.latency_target_ms:.1f} мс."
     )
     print(
-        "Горячие клавиши: +/= Program +1, -/_ Program -1, * toggle избранного, "
-        "PgUp/PgDown выбор по избранным, p/P/з/З список избранных, h/H/р/Р помощь."
+        f"Горячие клавиши: {colorize('+/=', ANSI_BLUE)} Program +1, "
+        f"{colorize('-/_', ANSI_BLUE)} Program -1, "
+        f"{colorize('*', ANSI_BLUE)} toggle избранного, "
+        f"{colorize('PgUp/PgDown', ANSI_BLUE)} выбор по избранным, "
+        f"{colorize('p/P', ANSI_BLUE)} список избранных, "
+        f"{colorize('h/H', ANSI_BLUE)} помощь."
     )
     print(f"Файл избранных: {favorites_path} (загружено: {len(favorites)})")
-    print("Прослушивание MIDI... Нажмите Ctrl+C для остановки.")
+    print(f"Прослушивание MIDI... Нажмите {colorize('Ctrl+C', ANSI_BLUE)} для остановки.")
 
     try:
         with mido.open_input(input_name) as midi_in:
