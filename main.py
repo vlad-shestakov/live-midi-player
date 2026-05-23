@@ -14,7 +14,7 @@ try:
 except ImportError:
     msvcrt = None
 
-APP_VERSION = "1.06 (23.05.2026)"
+APP_VERSION = "1.06.15 (23.05.2026)"
 
 CONFIG_FILENAME = "midi_ports.json"
 FAVORITES_FILENAME = "midi_favorites.json"
