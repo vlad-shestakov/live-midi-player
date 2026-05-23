@@ -13,6 +13,24 @@ import main
 
 
 class ProgramNameFormattingTests(unittest.TestCase):
+    def _poll_actions_from_keys(self, keys: list[str]) -> list[main.KeyboardAction]:
+        class StubMsvcrt:
+            def __init__(self, source_keys: list[str]) -> None:
+                self._keys = list(source_keys)
+
+            def kbhit(self) -> bool:
+                return bool(self._keys)
+
+            def getwch(self) -> str:
+                return self._keys.pop(0)
+
+        original_msvcrt = main.msvcrt
+        main.msvcrt = StubMsvcrt(keys)
+        try:
+            return main.poll_keyboard_actions()
+        finally:
+            main.msvcrt = original_msvcrt
+
     def test_gm_program_name_hit(self) -> None:
         self.assertEqual(main.gm_program_name(48), "String Ensemble 1")
 
@@ -120,11 +138,43 @@ class ProgramNameFormattingTests(unittest.TestCase):
         )
         self.assertIn(f"{main.ANSI_BLUE}+ или ={main.ANSI_RESET}", rendered)
         self.assertIn(f"{main.ANSI_BLUE}- или _{main.ANSI_RESET}", rendered)
+        self.assertIn(f"{main.ANSI_BLUE}F1..F10{main.ANSI_RESET}", rendered)
+        self.assertIn(
+            f"{main.ANSI_BLUE}Shift+F1..Shift+F10{main.ANSI_RESET}",
+            rendered,
+        )
         self.assertIn(f"{main.ANSI_BLUE}PgUp{main.ANSI_RESET}", rendered)
         self.assertIn(f"{main.ANSI_BLUE}PgDown{main.ANSI_RESET}", rendered)
         self.assertIn(f"{main.ANSI_BLUE}p/P{main.ANSI_RESET}", rendered)
         self.assertIn(f"{main.ANSI_BLUE}h/H{main.ANSI_RESET}", rendered)
         self.assertIn(f"{main.ANSI_BLUE}Ctrl+C{main.ANSI_RESET}", rendered)
+
+    def test_poll_keyboard_actions_maps_f_keys_to_favorite_indexes(self) -> None:
+        actions = self._poll_actions_from_keys(
+            ["\x00", ";", "\x00", "D", "\x00", "T", "\x00", "]"]
+        )
+        self.assertEqual(
+            [(action.kind, action.favorite_index) for action in actions],
+            [
+                ("favorite_select_index", 1),
+                ("favorite_select_index", 10),
+                ("favorite_select_index", 11),
+                ("favorite_select_index", 20),
+            ],
+        )
+
+    def test_poll_keyboard_actions_supports_alternative_f_key_codes(self) -> None:
+        actions = self._poll_actions_from_keys(["\x00", "K", "\x00", "G"])
+        self.assertEqual(
+            [(action.kind, action.favorite_index) for action in actions],
+            [("favorite_select_index", 1), ("favorite_select_index", 10)],
+        )
+
+    def test_format_missing_favorite_message_includes_requested_position(self) -> None:
+        self.assertEqual(
+            main.format_missing_favorite_message(12),
+            "Нет избранной программы №12, добавьте в избранные через *",
+        )
 
     def test_resolve_port_warning_prefix_is_red(self) -> None:
         output = StringIO()

@@ -14,7 +14,7 @@ try:
 except ImportError:
     msvcrt = None
 
-APP_VERSION = "1.05 (23.05.2026)"
+APP_VERSION = "1.06 (23.05.2026)"
 
 CONFIG_FILENAME = "midi_ports.json"
 FAVORITES_FILENAME = "midi_favorites.json"
@@ -25,6 +25,41 @@ ANSI_GREEN = "\033[32m"
 ANSI_YELLOW = "\033[33m"
 ANSI_BLUE = "\033[96m"
 ANSI_RED = "\033[31m"
+FUNCTION_KEY_TO_FAVORITE_POSITION: dict[str, int] = {
+    ";": 1,
+    "<": 2,
+    "=": 3,
+    ">": 4,
+    "?": 5,
+    "@": 6,
+    "A": 7,
+    "B": 8,
+    "C": 9,
+    "D": 10,
+    # Некоторые консоли/терминалы возвращают альтернативные коды.
+    "K": 1,
+    "L": 2,
+    "M": 3,
+    "N": 4,
+    "O": 5,
+    "P": 6,
+    "Q": 7,
+    "R": 8,
+    "S": 9,
+    "G": 10,
+}
+SHIFT_FUNCTION_KEY_TO_FAVORITE_POSITION: dict[str, int] = {
+    "T": 11,
+    "U": 12,
+    "V": 13,
+    "W": 14,
+    "X": 15,
+    "Y": 16,
+    "Z": 17,
+    "[": 18,
+    "\\": 19,
+    "]": 20,
+}
 GM_PROGRAM_NAMES: tuple[str, ...] = (
     "Acoustic Grand Piano",
     "Bright Acoustic Piano",
@@ -193,10 +228,12 @@ class KeyboardAction:
         "favorite_toggle",
         "favorite_prev",
         "favorite_next",
+        "favorite_select_index",
         "print_favorites",
         "print_help",
     ]
     step: int = 0
+    favorite_index: int = 0
 
 
 class ProgramController:
@@ -280,7 +317,22 @@ def poll_keyboard_actions() -> list[KeyboardAction]:
     while msvcrt.kbhit():
         key = msvcrt.getwch()
         if key in ("\x00", "\xe0"):
+            key_prefix = key
             extended_key = msvcrt.getwch()
+            if key_prefix == "\x00":
+                favorite_position = FUNCTION_KEY_TO_FAVORITE_POSITION.get(extended_key)
+                if favorite_position is None:
+                    favorite_position = SHIFT_FUNCTION_KEY_TO_FAVORITE_POSITION.get(
+                        extended_key
+                    )
+                if favorite_position is not None:
+                    actions.append(
+                        KeyboardAction(
+                            kind="favorite_select_index",
+                            favorite_index=favorite_position,
+                        )
+                    )
+                    continue
             if extended_key == "I":
                 actions.append(KeyboardAction(kind="favorite_next"))
             elif extended_key == "Q":
@@ -299,7 +351,13 @@ def poll_keyboard_actions() -> list[KeyboardAction]:
     if actions:
         has_plain_action = any(
             action.kind
-            in ("program_step", "favorite_toggle", "print_favorites", "print_help")
+            in (
+                "program_step",
+                "favorite_toggle",
+                "favorite_select_index",
+                "print_favorites",
+                "print_help",
+            )
             for action in actions
         )
         has_favorite_nav = any(
@@ -555,6 +613,10 @@ def format_favorite_selected_message(
     )
 
 
+def format_missing_favorite_message(position: int) -> str:
+    return f"Нет избранной программы №{position}, добавьте в избранные через *"
+
+
 def format_ready_instrument_message(channel: int, program: int, bank: int) -> str:
     return (
         f"Готов к игре: ch={channel + 1} "
@@ -566,6 +628,11 @@ def print_hotkeys() -> None:
     print(colorize("Быстрые клавиши:", ANSI_YELLOW))
     print(f"  {colorize('+ или =', ANSI_BLUE)} : Program +1")
     print(f"  {colorize('- или _', ANSI_BLUE)} : Program -1")
+    print(f"  {colorize('F1..F10', ANSI_BLUE)} : Выбрать 1..10 программу из избранных")
+    print(
+        f"  {colorize('Shift+F1..Shift+F10', ANSI_BLUE)} : "
+        "Выбрать 11..20 программу из избранных"
+    )
     print(
         f"  {colorize('*', ANSI_BLUE)}       : "
         "Добавить/удалить текущую программу в избранном"
@@ -1058,6 +1125,8 @@ def run(args: argparse.Namespace) -> None:
     print(
         f"Горячие клавиши: {colorize('+/=', ANSI_BLUE)} Program +1, "
         f"{colorize('-/_', ANSI_BLUE)} Program -1, "
+        f"{colorize('F1..F10', ANSI_BLUE)} 1..10 избранных, "
+        f"{colorize('Shift+F1..Shift+F10', ANSI_BLUE)} 11..20 избранных, "
         f"{colorize('*', ANSI_BLUE)} toggle избранного, "
         f"{colorize('PgUp/PgDown', ANSI_BLUE)} выбор по избранным, "
         f"{colorize('p/P', ANSI_BLUE)} список избранных, "
@@ -1110,6 +1179,28 @@ def run(args: argparse.Namespace) -> None:
                             action.step,
                             source="keyboard",
                             channel=keyboard_channel,
+                        )
+                        continue
+
+                    if action.kind == "favorite_select_index":
+                        target_position = action.favorite_index
+                        if target_position < 1 or target_position > len(favorites):
+                            print(format_missing_favorite_message(target_position))
+                            continue
+                        keyboard_channel = args.channel
+                        favorite_program = favorites[target_position - 1]
+                        last_favorite_index = target_position - 1
+                        program_controller.set_program(
+                            favorite_program,
+                            source="favorite_hotkey",
+                            channel=keyboard_channel,
+                        )
+                        print(
+                            format_favorite_selected_message(
+                                favorite_program,
+                                target_position,
+                                len(favorites),
+                            )
                         )
                         continue
 
