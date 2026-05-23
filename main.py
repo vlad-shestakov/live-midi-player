@@ -594,6 +594,14 @@ def favorite_prev(
     return favorites[index], index
 
 
+def favorite_hotkey_label(position: int) -> Optional[str]:
+    if 1 <= position <= 10:
+        return f"F{position}"
+    if 11 <= position <= 20:
+        return f"Shift-F{position - 10}"
+    return None
+
+
 def print_favorites(programs: list[int]) -> None:
     favorites_title = colorize("Избранные программы", ANSI_YELLOW)
     if not programs:
@@ -601,7 +609,25 @@ def print_favorites(programs: list[int]) -> None:
         return
     print(f"{favorites_title} ({len(programs)}):")
     for index, program in enumerate(programs, start=1):
-        print(f"  {index}. {format_program_with_name(program, bank=0)}")
+        hotkey_label = favorite_hotkey_label(index)
+        if hotkey_label is None:
+            print(f"  {index}. {format_program_with_name(program, bank=0)}")
+            continue
+        hotkey_rendered = colorize(hotkey_label, ANSI_BLUE)
+        print(f"  {index}. {hotkey_rendered} - {format_program_with_name(program, bank=0)}")
+    print()
+    print(
+        f"  {colorize('*', ANSI_BLUE)}       : "
+        "Добавить/удалить текущую программу в избранном"
+    )
+    print(
+        f"  {colorize('PgUp', ANSI_BLUE)}    : "
+        "Следующая избранная программа (по списку)"
+    )
+    print(
+        f"  {colorize('PgDown', ANSI_BLUE)}  : "
+        "Предыдущая избранная программа (по списку)"
+    )
 
 
 def format_favorite_selected_message(
