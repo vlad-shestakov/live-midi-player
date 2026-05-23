@@ -250,8 +250,7 @@ class ProgramController:
         self._engine.program_change(new_program, target_channel)
         print(
             f"[instrument] source={source} ch={target_channel + 1} "
-            f"program={format_program_with_name(old_program, bank)}"
-            f"->{format_program_with_name(new_program, bank)} "
+            f"program={old_program}->{format_program_with_name(new_program, bank)} "
             f"bank={bank} "
             f"(cc0={channel_state['bank_msb']}, cc32={channel_state['bank_lsb']})"
         )
@@ -519,8 +518,9 @@ def print_favorites(programs: list[int]) -> None:
     if not programs:
         print("Избранные программы: <пусто>")
         return
-    joined = ", ".join(str(program) for program in programs)
-    print(f"Избранные программы ({len(programs)}): {joined}")
+    print(f"Избранные программы ({len(programs)}):")
+    for index, program in enumerate(programs, start=1):
+        print(f"  {index}. {format_program_with_name(program, bank=0)}")
 
 
 def print_hotkeys() -> None:
