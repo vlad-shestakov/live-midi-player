@@ -4,10 +4,10 @@ overview: Выбрать Python-стек для прослушивания MIDI-
 todos:
   - id: choose-audio-engine
     content: "Выбрать целевой звуковой движок: DAW/VSTi (рекомендуется) или FluidSynth."
-    status: pending
+    status: completed
   - id: set-latency-target
     content: "Зафиксировать целевые аудио-настройки: ASIO/WASAPI, буфер 64-128, 48 kHz."
-    status: pending
+    status: in_progress
   - id: define-mvp
     content: "Определить MVP-поток: MIDI In -> обработка событий -> воспроизведение звука."
     status: pending

@@ -1,2 +1,8 @@
-# use install.bat OR pip install -r requirements.txt
-winsound
+# Use install.bat OR: pip install -r requirements.txt
+# for winsound_example.py
+# winsound
+
+# for midi_example.py
+mido
+python-rtmidi
+pyfluidsynth
