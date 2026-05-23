@@ -87,8 +87,8 @@ class FluidSynthEngine(AudioEngine):
             import fluidsynth
         except ImportError as exc:
             raise RuntimeError(
-                "Engine 'fluidsynth' requires package 'pyfluidsynth'. "
-                "Install dependencies from requirements.txt."
+                "Для движка 'fluidsynth' требуется пакет 'pyfluidsynth'. "
+                "Установите зависимости из requirements.txt."
             ) from exc
 
         self._synth = fluidsynth.Synth(samplerate=sample_rate)
@@ -134,7 +134,7 @@ def load_port_config(config_path: Path) -> dict[str, Optional[str]]:
         with config_path.open("r", encoding="utf-8") as config_file:
             raw = json.load(config_file)
     except json.JSONDecodeError as exc:
-        raise RuntimeError(f"Invalid JSON in config file: {config_path}") from exc
+        raise RuntimeError(f"Некорректный JSON в файле конфигурации: {config_path}") from exc
 
     input_port = raw.get("input_port")
     output_port = raw.get("output_port")
@@ -161,11 +161,11 @@ def print_ports() -> tuple[list[str], list[str]]:
     inputs = list(mido.get_input_names())
     outputs = list(mido.get_output_names())
 
-    print("MIDI input ports:")
+    print("Входные MIDI-порты:")
     for idx, name in enumerate(inputs, start=1):
         print(f"  {idx}. {name}")
 
-    print("\nMIDI output ports:")
+    print("\nВыходные MIDI-порты:")
     for idx, name in enumerate(outputs, start=1):
         print(f"  {idx}. {name}")
 
@@ -180,13 +180,13 @@ def resolve_port(
 ) -> str:
     ports = list(available_ports)
     if not ports:
-        raise RuntimeError(f"No {label} ports found.")
+        raise RuntimeError(f"Не найдены MIDI-порты ({label}).")
 
     if cli_value:
         if cli_value not in ports:
             available = ", ".join(ports)
             raise RuntimeError(
-                f"{label} port '{cli_value}' not found. Available: {available}"
+                f"Порт ({label}) '{cli_value}' не найден. Доступные: {available}"
             )
         return cli_value
 
@@ -194,8 +194,8 @@ def resolve_port(
         if config_value in ports:
             return config_value
         print(
-            f"Warning: saved {label} port '{config_value}' is unavailable. "
-            f"Using fallback '{ports[0]}'."
+            f"Предупреждение: сохраненный порт ({label}) '{config_value}' недоступен. "
+            f"Используется резервный вариант '{ports[0]}'."
         )
 
     return ports[0]
@@ -203,89 +203,97 @@ def resolve_port(
 
 def show_saved_config(config_path: Path) -> None:
     config = load_port_config(config_path)
-    print(f"Config file: {config_path}")
-    print(f"Saved input port : {config.get('input_port') or '<not set>'}")
-    print(f"Saved output port: {config.get('output_port') or '<not set>'}")
+    print(f"Файл конфигурации: {config_path}")
+    print(f"Сохраненный входной порт : {config.get('input_port') or '<не задан>'}")
+    print(f"Сохраненный выходной порт: {config.get('output_port') or '<не задан>'}")
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Real-time MIDI keyboard listener with two playback engines: "
-            "DAW/VST via MIDI out or local FluidSynth."
+            "Слушатель MIDI-клавиатуры в реальном времени с двумя движками "
+            "воспроизведения: DAW/VST через MIDI Out или локальный FluidSynth."
         )
     )
     parser.add_argument(
         "--engine",
         choices=["midi-out", "fluidsynth"],
         default="midi-out",
-        help="Playback engine. Default is midi-out for DAW/VST quality.",
+        help="Движок воспроизведения. По умолчанию midi-out для качества DAW/VST.",
     )
     parser.add_argument(
-        "--list-ports", action="store_true", help="List MIDI ports and exit."
+        "--list-ports", action="store_true", help="Показать MIDI-порты и выйти."
     )
     parser.add_argument(
         "--show-config",
         action="store_true",
-        help="Show saved input/output port config and exit.",
+        help="Показать сохраненную конфигурацию входного/выходного портов и выйти.",
     )
     parser.add_argument(
         "--set-config",
         action="store_true",
-        help="Save --input-port and/or --output-port to config and exit.",
+        help="Сохранить --input-port и/или --output-port в конфигурацию и выйти.",
     )
     parser.add_argument(
         "--config",
         default=str(default_config_path()),
-        help="Path to MIDI port config JSON file.",
+        help="Путь к JSON-файлу конфигурации MIDI-портов.",
     )
     parser.add_argument(
         "--input-port",
-        help="MIDI input port name. If omitted, first available input is used.",
+        help="Имя входного MIDI-порта. Если не указано, берется первый доступный.",
     )
     parser.add_argument(
         "--output-port",
-        help="MIDI output port name for engine midi-out. If omitted, first output is used.",
+        help="Имя выходного MIDI-порта для движка midi-out. Если не указано, берется первый доступный.",
     )
     parser.add_argument(
         "--soundfont",
-        help="Path to .sf2 file for engine fluidsynth.",
+        help="Путь к .sf2-файлу для движка fluidsynth.",
     )
-    parser.add_argument("--channel", type=int, default=0, help="Default MIDI channel 0-15.")
-    parser.add_argument("--bank", type=int, default=0, help="FluidSynth preset bank.")
-    parser.add_argument("--program", type=int, default=0, help="FluidSynth preset program.")
-    parser.add_argument("--sample-rate", type=int, default=48000, help="Audio sample rate.")
+    parser.add_argument(
+        "--channel", type=int, default=0, help="MIDI-канал по умолчанию: 0-15."
+    )
+    parser.add_argument("--bank", type=int, default=0, help="Банк пресета FluidSynth.")
+    parser.add_argument(
+        "--program", type=int, default=0, help="Номер пресета FluidSynth."
+    )
+    parser.add_argument(
+        "--sample-rate", type=int, default=48000, help="Частота дискретизации аудио."
+    )
     parser.add_argument(
         "--audio-driver",
         default=None,
-        help="FluidSynth audio driver (for example dsound, wasapi, asio).",
+        help="Аудиодрайвер FluidSynth (например: dsound, wasapi, asio).",
     )
     parser.add_argument(
         "--buffer",
         type=int,
         default=64,
-        help="Target audio buffer in samples (informational). Recommended: 64-128.",
+        help="Целевой аудиобуфер в сэмплах (информационно). Рекомендуется: 64-128.",
     )
     parser.add_argument(
         "--latency-target-ms",
         type=float,
         default=10.0,
-        help="Target end-to-end latency in milliseconds (informational).",
+        help="Целевая сквозная задержка в миллисекундах (информационно).",
     )
     parser.add_argument(
-        "--verbose", action="store_true", help="Print incoming MIDI messages."
+        "--verbose", action="store_true", help="Печатать входящие MIDI-сообщения."
     )
     parser.add_argument(
         "--save-ports",
         action="store_true",
-        help="Persist resolved input/output ports to config before listening.",
+        help="Сохранить выбранные входной/выходной порты в конфигурацию перед запуском.",
     )
     return parser.parse_args()
 
 
 def update_saved_config(args: argparse.Namespace, config_path: Path) -> None:
     if not args.input_port and not args.output_port:
-        raise RuntimeError("Use --input-port and/or --output-port with --set-config.")
+        raise RuntimeError(
+            "Используйте --input-port и/или --output-port вместе с --set-config."
+        )
 
     current = load_port_config(config_path)
     input_names = list(mido.get_input_names())
@@ -295,31 +303,35 @@ def update_saved_config(args: argparse.Namespace, config_path: Path) -> None:
     new_output = current.get("output_port")
 
     if args.input_port:
-        new_input = resolve_port(args.input_port, None, input_names, "input")
+        new_input = resolve_port(args.input_port, None, input_names, "входной")
     if args.output_port:
-        new_output = resolve_port(args.output_port, None, output_names, "output")
+        new_output = resolve_port(args.output_port, None, output_names, "выходной")
 
     save_port_config(config_path, new_input, new_output)
-    print(f"Saved config to {config_path}")
-    print(f"Current input port : {new_input or '<not set>'}")
-    print(f"Current output port: {new_output or '<not set>'}")
+    print(f"Конфигурация сохранена в {config_path}")
+    print(f"Текущий входной порт : {new_input or '<не задан>'}")
+    print(f"Текущий выходной порт: {new_output or '<не задан>'}")
 
 
 def build_engine(args: argparse.Namespace, output_name: Optional[str]) -> AudioEngine:
     if args.engine == "midi-out":
         if not output_name:
-            raise RuntimeError("Unable to resolve output port for engine midi-out.")
-        print(f"Engine: MIDI out -> {output_name}")
+            raise RuntimeError(
+                "Не удалось определить выходной порт для движка midi-out."
+            )
+        print(f"Движок: MIDI out -> {output_name}")
         return MidiOutEngine(output_name)
 
     if not args.soundfont:
-        raise RuntimeError("Engine 'fluidsynth' requires --soundfont path to a .sf2 file.")
+        raise RuntimeError(
+            "Для движка 'fluidsynth' необходимо указать --soundfont с путем к .sf2-файлу."
+        )
 
     soundfont = Path(args.soundfont)
     if not soundfont.exists():
-        raise RuntimeError(f"SoundFont file not found: {soundfont}")
+        raise RuntimeError(f"Файл SoundFont не найден: {soundfont}")
 
-    print(f"Engine: FluidSynth -> {soundfont}")
+    print(f"Движок: FluidSynth -> {soundfont}")
     return FluidSynthEngine(
         soundfont_path=str(soundfont),
         channel=args.channel,
@@ -376,7 +388,7 @@ def run(args: argparse.Namespace) -> None:
         return
 
     if not 0 <= args.channel <= 15:
-        raise RuntimeError("--channel must be in range 0..15")
+        raise RuntimeError("--channel должен быть в диапазоне 0..15")
 
     config = load_port_config(config_path)
     input_names = list(mido.get_input_names())
@@ -384,7 +396,7 @@ def run(args: argparse.Namespace) -> None:
         args.input_port,
         config.get("input_port"),
         input_names,
-        "input",
+        "входной",
     )
 
     output_name: Optional[str] = None
@@ -394,7 +406,7 @@ def run(args: argparse.Namespace) -> None:
             args.output_port,
             config.get("output_port"),
             output_names,
-            "output",
+            "выходной",
         )
 
     if args.save_ports:
@@ -403,22 +415,22 @@ def run(args: argparse.Namespace) -> None:
             input_name,
             output_name if args.engine == "midi-out" else config.get("output_port"),
         )
-        print(f"Saved selected ports to {config_path}")
+        print(f"Выбранные порты сохранены в {config_path}")
 
     engine = build_engine(args, output_name)
 
-    print(f"Input: {input_name}")
+    print(f"Вход: {input_name}")
     if output_name:
-        print(f"Output: {output_name}")
+        print(f"Выход: {output_name}")
     print(
-        "Recommended audio setup: ASIO or WASAPI exclusive, "
-        "buffer 64-128 samples, sample rate 48000 Hz."
+        "Рекомендуемая аудиоконфигурация: ASIO или WASAPI exclusive, "
+        "буфер 64-128 сэмплов, частота 48000 Гц."
     )
     print(
-        f"Configured target: buffer={args.buffer} samples, "
-        f"latency<={args.latency_target_ms:.1f} ms."
+        f"Целевые параметры: buffer={args.buffer} сэмплов, "
+        f"latency<={args.latency_target_ms:.1f} мс."
     )
-    print("Listening for MIDI... Press Ctrl+C to stop.")
+    print("Прослушивание MIDI... Нажмите Ctrl+C для остановки.")
 
     try:
         with mido.open_input(input_name) as midi_in:
@@ -439,7 +451,7 @@ if __name__ == "__main__":
     try:
         run(parse_args())
     except KeyboardInterrupt:
-        print("\nStopped by user.")
+        print("\nОстановлено пользователем.")
     except Exception as exc:
-        print(f"Error: {exc}")
+        print(f"Ошибка: {exc}")
         raise SystemExit(1)

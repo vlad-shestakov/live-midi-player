@@ -1,5 +1,5 @@
 @echo off
-setlocal
+setlocal EnableDelayedExpansion
 
 cd /d "%~dp0"
 
@@ -36,18 +36,18 @@ goto end
 :menu
 cls
 echo ==========================================
-echo     MIDI Port Configurator (interactive)
+echo   Настройка MIDI-портов (интерактивно)
 echo ==========================================
 echo.
-echo  1. Show saved config
-echo  2. List current MIDI ports
-echo  3. Set input port
-echo  4. Set output port
-echo  5. Set input and output ports
-echo  6. Run player (main.py)
-echo  0. Exit
+echo  1. Показать сохраненную конфигурацию
+echo  2. Показать текущие MIDI-порты
+echo  3. Установить входной порт
+echo  4. Установить выходной порт
+echo  5. Установить входной и выходной порты
+echo  6. Запустить плеер (main.py)
+echo  0. Выход
 echo.
-set /p MENU_CHOICE=Select action: 
+set /p MENU_CHOICE=Выберите действие: 
 
 if "%MENU_CHOICE%"=="1" goto menu_show_config
 if "%MENU_CHOICE%"=="2" goto menu_list_ports
@@ -57,7 +57,7 @@ if "%MENU_CHOICE%"=="5" goto menu_set_both
 if "%MENU_CHOICE%"=="6" goto menu_run
 if "%MENU_CHOICE%"=="0" goto end
 
-echo Invalid option.
+echo Неверный пункт меню.
 pause
 goto menu
 
@@ -74,50 +74,115 @@ pause
 goto menu
 
 :menu_set_input
-echo Enter input port name exactly as shown in list:
-set /p INPUT_NAME=Input port: 
-"%PYTHON_EXE%" main.py --set-config --input-port "%INPUT_NAME%"
+call :select_port_by_number "input" INPUT_NAME
+if errorlevel 1 goto menu
+"%PYTHON_EXE%" main.py --set-config --input-port "!INPUT_NAME!"
 echo.
 pause
 goto menu
 
 :menu_set_output
-echo Enter output port name exactly as shown in list:
-set /p OUTPUT_NAME=Output port: 
-"%PYTHON_EXE%" main.py --set-config --output-port "%OUTPUT_NAME%"
+call :select_port_by_number "output" OUTPUT_NAME
+if errorlevel 1 goto menu
+"%PYTHON_EXE%" main.py --set-config --output-port "!OUTPUT_NAME!"
 echo.
 pause
 goto menu
 
 :menu_set_both
-echo Enter input port name exactly as shown in list:
-set /p INPUT_NAME=Input port: 
-echo Enter output port name exactly as shown in list:
-set /p OUTPUT_NAME=Output port: 
+echo Введите имя входного порта точно как в списке:
+set /p INPUT_NAME=Входной порт: 
+echo Введите имя выходного порта точно как в списке:
+set /p OUTPUT_NAME=Выходной порт: 
 "%PYTHON_EXE%" main.py --set-config --input-port "%INPUT_NAME%" --output-port "%OUTPUT_NAME%"
 echo.
 pause
 goto menu
 
 :menu_run
-echo Starting MIDI player with current config...
+echo Запуск MIDI-плеера с текущей конфигурацией...
 "%PYTHON_EXE%" main.py
 echo.
 pause
 goto menu
 
 :usage
-echo Usage:
+echo Использование:
 echo   configure_ports.bat
 echo   configure_ports.bat show-config
 echo   configure_ports.bat list-ports
-echo   configure_ports.bat set --input-port "INPUT_NAME" --output-port "OUTPUT_NAME"
-echo   configure_ports.bat run [main.py arguments]
+echo   configure_ports.bat set --input-port "ИМЯ_ВХОДА" --output-port "ИМЯ_ВЫХОДА"
+echo   configure_ports.bat run [аргументы main.py]
 echo.
-echo Examples:
+echo Примеры:
 echo   configure_ports.bat set --input-port "LKMK3 MIDI 0"
 echo   configure_ports.bat set --output-port "Microsoft GS Wavetable Synth 0"
 echo   configure_ports.bat run --engine midi-out
+
+goto end
+
+:select_port_by_number
+set "PORT_KIND=%~1"
+set "PORT_COUNT=0"
+for /f "tokens=1 delims==" %%V in ('set PORT_ 2^>nul') do set "%%V="
+
+if /I "%PORT_KIND%"=="input" (
+    set "PORT_LABEL=входных"
+) else (
+    set "PORT_LABEL=выходных"
+)
+
+for /f "usebackq delims=" %%L in (`"%PYTHON_EXE%" main.py --list-ports`) do (
+    set "LINE=%%L"
+
+    if "!LINE!"=="Входные MIDI-порты:" set "SECTION=input"
+    if "!LINE!"=="Выходные MIDI-порты:" set "SECTION=output"
+
+    if defined SECTION (
+        echo !LINE! | findstr /R "^[ ]*[0-9][0-9]*\..*" >nul
+        if not errorlevel 1 (
+            set "ENTRY=!LINE:*.=!"
+            if "!ENTRY:~0,1!"==" " set "ENTRY=!ENTRY:~1!"
+            if /I "!SECTION!"=="!PORT_KIND!" (
+                set /a PORT_COUNT+=1
+                set "PORT_!PORT_COUNT!=!ENTRY!"
+            )
+        )
+    )
+)
+
+if !PORT_COUNT! LEQ 0 (
+    echo Не найдено !PORT_LABEL! MIDI-портов.
+    exit /b 1
+)
+
+echo Доступные !PORT_LABEL! MIDI-порты:
+for /L %%I in (1,1,!PORT_COUNT!) do echo   %%I. !PORT_%%I!
+echo.
+
+:select_port_retry
+set "PORT_INDEX="
+set /p PORT_INDEX=Выберите порт по номеру: 
+
+if not defined PORT_INDEX (
+    echo Введите число от 1 до !PORT_COUNT!.
+    goto select_port_retry
+)
+
+echo(!PORT_INDEX! | findstr /R "^[1-9][0-9]*$" >nul
+if errorlevel 1 (
+    echo Введите число от 1 до !PORT_COUNT!.
+    goto select_port_retry
+)
+
+if !PORT_INDEX! GTR !PORT_COUNT! (
+    echo Номер вне диапазона. Доступно: 1..!PORT_COUNT!.
+    goto select_port_retry
+)
+
+for %%I in (!PORT_INDEX!) do set "SELECTED_PORT=!PORT_%%I!"
+set "%~2=!SELECTED_PORT!"
+exit /b 0
 
 :end
 endlocal
