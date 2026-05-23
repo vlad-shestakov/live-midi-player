@@ -90,11 +90,11 @@ pause
 goto menu
 
 :menu_set_both
-echo Введите имя входного порта точно как в списке:
-set /p INPUT_NAME=Входной порт: 
-echo Введите имя выходного порта точно как в списке:
-set /p OUTPUT_NAME=Выходной порт: 
-"%PYTHON_EXE%" main.py --set-config --input-port "%INPUT_NAME%" --output-port "%OUTPUT_NAME%"
+call :select_port_by_number "input" INPUT_NAME
+if errorlevel 1 goto menu
+call :select_port_by_number "output" OUTPUT_NAME
+if errorlevel 1 goto menu
+"%PYTHON_EXE%" main.py --set-config --input-port "!INPUT_NAME!" --output-port "!OUTPUT_NAME!"
 echo.
 pause
 goto menu
@@ -132,23 +132,9 @@ if /I "%PORT_KIND%"=="input" (
     set "PORT_LABEL=выходных"
 )
 
-for /f "usebackq delims=" %%L in (`"%PYTHON_EXE%" main.py --list-ports`) do (
-    set "LINE=%%L"
-
-    if "!LINE!"=="Входные MIDI-порты:" set "SECTION=input"
-    if "!LINE!"=="Выходные MIDI-порты:" set "SECTION=output"
-
-    if defined SECTION (
-        echo !LINE! | findstr /R "^[ ]*[0-9][0-9]*\..*" >nul
-        if not errorlevel 1 (
-            set "ENTRY=!LINE:*.=!"
-            if "!ENTRY:~0,1!"==" " set "ENTRY=!ENTRY:~1!"
-            if /I "!SECTION!"=="!PORT_KIND!" (
-                set /a PORT_COUNT+=1
-                set "PORT_!PORT_COUNT!=!ENTRY!"
-            )
-        )
-    )
+for /f "usebackq delims=" %%L in (`"%PYTHON_EXE%" -c "import mido,sys; kind=sys.argv[1]; ports=mido.get_input_names() if kind=='input' else mido.get_output_names(); [print(p) for p in ports]" "!PORT_KIND!"`) do (
+    set /a PORT_COUNT+=1
+    set "PORT_!PORT_COUNT!=%%L"
 )
 
 if !PORT_COUNT! LEQ 0 (
