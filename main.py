@@ -172,6 +172,21 @@ def print_ports() -> tuple[list[str], list[str]]:
     return inputs, outputs
 
 
+def print_ports_json(kind: Optional[str] = None) -> None:
+    inputs = list(mido.get_input_names())
+    outputs = list(mido.get_output_names())
+
+    if kind == "input":
+        print(json.dumps(inputs, ensure_ascii=False, indent=2))
+        return
+
+    if kind == "output":
+        print(json.dumps(outputs, ensure_ascii=False, indent=2))
+        return
+
+    print(json.dumps({"inputs": inputs, "outputs": outputs}, ensure_ascii=False, indent=2))
+
+
 def resolve_port(
     cli_value: Optional[str],
     config_value: Optional[str],
@@ -223,6 +238,16 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--list-ports", action="store_true", help="Показать MIDI-порты и выйти."
+    )
+    parser.add_argument(
+        "--list-ports-json",
+        action="store_true",
+        help="Показать MIDI-порты в JSON-формате и выйти.",
+    )
+    parser.add_argument(
+        "--ports-kind",
+        choices=["input", "output"],
+        help="Ограничить вывод --list-ports-json списком input/output.",
     )
     parser.add_argument(
         "--show-config",
@@ -377,6 +402,10 @@ def run(args: argparse.Namespace) -> None:
 
     if args.list_ports:
         print_ports()
+        return
+
+    if args.list_ports_json:
+        print_ports_json(args.ports_kind)
         return
 
     if args.show_config:

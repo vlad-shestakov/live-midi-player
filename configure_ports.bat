@@ -132,9 +132,18 @@ if /I "%PORT_KIND%"=="input" (
     set "PORT_LABEL=выходных"
 )
 
-for /f "usebackq delims=" %%L in (`"%PYTHON_EXE%" -c "import mido,sys; kind=sys.argv[1]; ports=mido.get_input_names() if kind=='input' else mido.get_output_names(); [print(p) for p in ports]" "!PORT_KIND!"`) do (
-    set /a PORT_COUNT+=1
-    set "PORT_!PORT_COUNT!=%%L"
+for /f "usebackq delims=" %%L in (`"%PYTHON_EXE%" main.py --list-ports-json --ports-kind "!PORT_KIND!"`) do (
+    set "ENTRY=%%L"
+    for /f "tokens=* delims= " %%A in ("!ENTRY!") do set "ENTRY=%%A"
+    if not "!ENTRY!"=="[" if not "!ENTRY!"=="]" (
+        if "!ENTRY:~-1!"=="," set "ENTRY=!ENTRY:~0,-1!"
+        if "!ENTRY:~0,1!"=="^"" set "ENTRY=!ENTRY:~1!"
+        if "!ENTRY:~-1!"=="^"" set "ENTRY=!ENTRY:~0,-1!"
+        if defined ENTRY (
+            set /a PORT_COUNT+=1
+            set "PORT_!PORT_COUNT!=!ENTRY!"
+        )
+    )
 )
 
 if !PORT_COUNT! LEQ 0 (
