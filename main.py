@@ -528,7 +528,8 @@ def run(args: argparse.Namespace) -> None:
                 for msg in midi_in.iter_pending():
                     handled_any = True
                     if args.verbose:
-                        print(msg)
+                        if msg.type != "clock":
+                            print(msg)
                         log_instrument_observability(msg, args.channel, channel_state)
                     handle_message(msg, engine, args.channel)
                 if not handled_any:
