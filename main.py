@@ -157,7 +157,6 @@ GM_PROGRAM_NAMES: tuple[str, ...] = (
     "Gunshot",
 )
 
-
 def wrap_program(program: int) -> int:
     return program % PROGRAM_RANGE
 
@@ -259,6 +258,12 @@ class ProgramController:
         new_program = wrap_program(program)
         bank = current_bank_value(channel_state)
         channel_state["program"] = new_program
+        bank_msb = channel_state.get("bank_msb") or 0
+        bank_lsb = channel_state.get("bank_lsb") or 0
+        self._engine.control_change(123, 0, target_channel)  # all notes off
+        self._engine.control_change(121, 0, target_channel)  # reset controllers
+        self._engine.control_change(0, bank_msb, target_channel)
+        self._engine.control_change(32, bank_lsb, target_channel)
         self._engine.program_change(new_program, target_channel)
         print(
             f"[instrument] source={source} ch={target_channel + 1} "
@@ -851,7 +856,8 @@ def build_engine(args: argparse.Namespace, output_name: Optional[str]) -> AudioE
 
 
 def handle_message(msg: mido.Message, engine: AudioEngine, default_channel: int) -> None:
-    channel = getattr(msg, "channel", default_channel)
+    # Keep output channel stable regardless of incoming controller channel.
+    channel = default_channel
 
     if msg.type == "note_on":
         if msg.velocity == 0:
@@ -1083,6 +1089,7 @@ def run(args: argparse.Namespace) -> None:
                 for msg in midi_in.iter_pending():
                     handled_any = True
                     program_controller.sync_from_message(msg)
+                    program_controller.last_active_channel = args.channel
                     if args.verbose:
                         if msg.type != "clock":
                             print(msg)
@@ -1107,10 +1114,11 @@ def run(args: argparse.Namespace) -> None:
                     handled_any = True
                 for action in keyboard_actions:
                     if action.kind == "program_step" and action.step != 0:
+                        keyboard_channel = args.channel
                         program_controller.change_program(
                             action.step,
                             source="keyboard",
-                            channel=args.channel,
+                            channel=keyboard_channel,
                         )
                         continue
 
