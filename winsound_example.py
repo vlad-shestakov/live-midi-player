@@ -83,15 +83,15 @@ def play_motif(
 
 
 def main():
-    print("🎬 Воспроизведение темы из «Близких контактов третьей степени» (1977)")
-    print("💡 Нажмите Ctrl+C для остановки\n")
+    print("Воспроизведение темы из «Близких контактов третьей степени» (1977)")
+    print("Нажмите Ctrl+C для остановки\n")
     try:
         play_motif(CLOSE_ENCOUNTERS_SEQUENCE)
-        print("\n✅ Фраза успешно воспроизведена.")
+        print("\nФраза успешно воспроизведена.")
     except KeyboardInterrupt:
-        print("\n⛔ Воспроизведение прервано пользователем.")
+        print("\nВоспроизведение прервано пользователем.")
     except Exception as e:
-        print(f"\n❌ Ошибка: {e}")
+        print(f"\nОшибка: {e}")
 
 
 if __name__ == "__main__":

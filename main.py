@@ -1,5 +1,5 @@
-﻿# print("Hello, World!")
-# print('\a')
+﻿print("Hello, World!")
+print("Это музыкальный модуль")
 
 import winsound_example
 
