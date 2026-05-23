@@ -18,10 +18,162 @@ CONFIG_FILENAME = "midi_ports.json"
 FAVORITES_FILENAME = "midi_favorites.json"
 PROGRAM_RANGE = 128
 PENDING_EXTENDED_KEY = False
+GM_REFERENCE_TAG = "[GM reference]"
+GM_PROGRAM_NAMES: tuple[str, ...] = (
+    "Acoustic Grand Piano",
+    "Bright Acoustic Piano",
+    "Electric Grand Piano",
+    "Honky-tonk Piano",
+    "Electric Piano 1",
+    "Electric Piano 2",
+    "Harpsichord",
+    "Clavi",
+    "Celesta",
+    "Glockenspiel",
+    "Music Box",
+    "Vibraphone",
+    "Marimba",
+    "Xylophone",
+    "Tubular Bells",
+    "Dulcimer",
+    "Drawbar Organ",
+    "Percussive Organ",
+    "Rock Organ",
+    "Church Organ",
+    "Reed Organ",
+    "Accordion",
+    "Harmonica",
+    "Tango Accordion",
+    "Acoustic Guitar (nylon)",
+    "Acoustic Guitar (steel)",
+    "Electric Guitar (jazz)",
+    "Electric Guitar (clean)",
+    "Electric Guitar (muted)",
+    "Overdriven Guitar",
+    "Distortion Guitar",
+    "Guitar harmonics",
+    "Acoustic Bass",
+    "Electric Bass (finger)",
+    "Electric Bass (pick)",
+    "Fretless Bass",
+    "Slap Bass 1",
+    "Slap Bass 2",
+    "Synth Bass 1",
+    "Synth Bass 2",
+    "Violin",
+    "Viola",
+    "Cello",
+    "Contrabass",
+    "Tremolo Strings",
+    "Pizzicato Strings",
+    "Orchestral Harp",
+    "Timpani",
+    "String Ensemble 1",
+    "String Ensemble 2",
+    "SynthStrings 1",
+    "SynthStrings 2",
+    "Choir Aahs",
+    "Voice Oohs",
+    "Synth Voice",
+    "Orchestra Hit",
+    "Trumpet",
+    "Trombone",
+    "Tuba",
+    "Muted Trumpet",
+    "French Horn",
+    "Brass Section",
+    "SynthBrass 1",
+    "SynthBrass 2",
+    "Soprano Sax",
+    "Alto Sax",
+    "Tenor Sax",
+    "Baritone Sax",
+    "Oboe",
+    "English Horn",
+    "Bassoon",
+    "Clarinet",
+    "Piccolo",
+    "Flute",
+    "Recorder",
+    "Pan Flute",
+    "Blown Bottle",
+    "Shakuhachi",
+    "Whistle",
+    "Ocarina",
+    "Lead 1 (square)",
+    "Lead 2 (sawtooth)",
+    "Lead 3 (calliope)",
+    "Lead 4 (chiff)",
+    "Lead 5 (charang)",
+    "Lead 6 (voice)",
+    "Lead 7 (fifths)",
+    "Lead 8 (bass + lead)",
+    "Pad 1 (new age)",
+    "Pad 2 (warm)",
+    "Pad 3 (polysynth)",
+    "Pad 4 (choir)",
+    "Pad 5 (bowed)",
+    "Pad 6 (metallic)",
+    "Pad 7 (halo)",
+    "Pad 8 (sweep)",
+    "FX 1 (rain)",
+    "FX 2 (soundtrack)",
+    "FX 3 (crystal)",
+    "FX 4 (atmosphere)",
+    "FX 5 (brightness)",
+    "FX 6 (goblins)",
+    "FX 7 (echoes)",
+    "FX 8 (sci-fi)",
+    "Sitar",
+    "Banjo",
+    "Shamisen",
+    "Koto",
+    "Kalimba",
+    "Bag pipe",
+    "Fiddle",
+    "Shanai",
+    "Tinkle Bell",
+    "Agogo",
+    "Steel Drums",
+    "Woodblock",
+    "Taiko Drum",
+    "Melodic Tom",
+    "Synth Drum",
+    "Reverse Cymbal",
+    "Guitar Fret Noise",
+    "Breath Noise",
+    "Seashore",
+    "Bird Tweet",
+    "Telephone Ring",
+    "Helicopter",
+    "Applause",
+    "Gunshot",
+)
 
 
 def wrap_program(program: int) -> int:
     return program % PROGRAM_RANGE
+
+
+def gm_program_name(program: int) -> Optional[str]:
+    if 0 <= program < PROGRAM_RANGE:
+        return GM_PROGRAM_NAMES[program]
+    return None
+
+
+def resolve_instrument_name(program: int, bank: int) -> tuple[str, bool]:
+    del bank
+    name = gm_program_name(program)
+    if name is None:
+        return "unknown", False
+    return name, True
+
+
+def format_program_with_name(program: int, bank: int) -> str:
+    name, is_reference = resolve_instrument_name(program, bank)
+    if is_reference:
+        return f"{program} ({name} {GM_REFERENCE_TAG})"
+    return f"{program} ({name})"
 
 
 @dataclass(frozen=True)
@@ -93,12 +245,14 @@ class ProgramController:
         channel_state = self._ensure_channel_state(target_channel)
         old_program = self._current_program(channel_state)
         new_program = wrap_program(program)
+        bank = current_bank_value(channel_state)
         channel_state["program"] = new_program
         self._engine.program_change(new_program, target_channel)
         print(
             f"[instrument] source={source} ch={target_channel + 1} "
-            f"program={old_program}->{new_program} "
-            f"bank={current_bank_value(channel_state)} "
+            f"program={format_program_with_name(old_program, bank)}"
+            f"->{format_program_with_name(new_program, bank)} "
+            f"bank={bank} "
             f"(cc0={channel_state['bank_msb']}, cc32={channel_state['bank_lsb']})"
         )
 
@@ -725,17 +879,26 @@ def log_instrument_observability(
 
     if msg.type == "program_change":
         channel_state["program"] = msg.program
+        bank = current_bank_value(channel_state)
         print(
-            f"[instrument] ch={channel + 1} program={msg.program} "
-            f"bank={current_bank_value(channel_state)} "
+            f"[instrument] ch={channel + 1} "
+            f"program={format_program_with_name(msg.program, bank)} "
+            f"bank={bank} "
             f"(cc0={channel_state['bank_msb']}, cc32={channel_state['bank_lsb']})"
         )
         return
 
     if msg.type == "note_on" and msg.velocity > 0:
+        current_program = channel_state["program"]
+        if isinstance(current_program, int):
+            program_repr = format_program_with_name(
+                current_program, current_bank_value(channel_state)
+            )
+        else:
+            program_repr = f"{current_program} (unknown)"
         print(
             f"[play] ch={channel + 1} note={msg.note} vel={msg.velocity} "
-            f"program={channel_state['program']} bank={current_bank_value(channel_state)}"
+            f"program={program_repr} bank={current_bank_value(channel_state)}"
         )
 
 
