@@ -19,7 +19,6 @@ APP_VERSION = "1.04 (23.05.2026)"
 CONFIG_FILENAME = "midi_ports.json"
 FAVORITES_FILENAME = "midi_favorites.json"
 PROGRAM_RANGE = 128
-PENDING_EXTENDED_KEY = False
 GM_REFERENCE_TAG = "[GM reference]"
 ANSI_RESET = "\033[0m"
 ANSI_GREEN = "\033[32m"
@@ -274,30 +273,18 @@ class ProgramController:
 
 
 def poll_keyboard_actions() -> list[KeyboardAction]:
-    global PENDING_EXTENDED_KEY
     if msvcrt is None:
         return []
 
     actions: list[KeyboardAction] = []
     while msvcrt.kbhit():
         key = msvcrt.getwch()
-        if PENDING_EXTENDED_KEY:
-            PENDING_EXTENDED_KEY = False
-            extended_key = key
+        if key in ("\x00", "\xe0"):
+            extended_key = msvcrt.getwch()
             if extended_key == "I":
                 actions.append(KeyboardAction(kind="favorite_next"))
             elif extended_key == "Q":
                 actions.append(KeyboardAction(kind="favorite_prev"))
-            continue
-        if key in ("\x00", "\xe0"):
-            if msvcrt.kbhit():
-                extended_key = msvcrt.getwch()
-                if extended_key == "I":
-                    actions.append(KeyboardAction(kind="favorite_next"))
-                elif extended_key == "Q":
-                    actions.append(KeyboardAction(kind="favorite_prev"))
-            else:
-                PENDING_EXTENDED_KEY = True
             continue
         if key in ("+", "="):
             actions.append(KeyboardAction(kind="program_step", step=1))
@@ -966,16 +953,20 @@ def log_instrument_observability(
         return
 
     if msg.type == "note_on" and msg.velocity > 0:
-        current_program = channel_state["program"]
+        # Reflect actual synth output channel (same routing as handle_message).
+        observed_channel = default_channel
+        observed_state = state.setdefault(
+            observed_channel,
+            {"bank_msb": 0, "bank_lsb": 0, "program": None},
+        )
+        current_program = observed_state["program"]
         if isinstance(current_program, int):
-            program_repr = format_program_with_name(
-                current_program, current_bank_value(channel_state)
-            )
+            program_repr = format_program_with_name(current_program, current_bank_value(observed_state))
         else:
             program_repr = f"{current_program} (unknown)"
         print(
-            f"[play] ch={channel + 1} note={msg.note} vel={msg.velocity} "
-            f"program={program_repr} bank={current_bank_value(channel_state)}"
+            f"[play] ch={observed_channel + 1} note={msg.note} vel={msg.velocity} "
+            f"program={program_repr} bank={current_bank_value(observed_state)}"
         )
 
 
