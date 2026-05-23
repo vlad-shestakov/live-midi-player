@@ -23,7 +23,7 @@ APP_VERSION = "1.03 (23.05.2026)"
 ANSI_RESET = "\033[0m"
 ANSI_GREEN = "\033[32m"
 ANSI_YELLOW = "\033[33m"
-ANSI_BLUE = "\033[34m"
+ANSI_BLUE = "\033[96m"
 ANSI_RED = "\033[31m"
 GM_PROGRAM_NAMES: tuple[str, ...] = (
     "Acoustic Grand Piano",
@@ -996,7 +996,7 @@ def run(args: argparse.Namespace) -> None:
         )
         print(f"Выбранные порты сохранены в {config_path}")
 
-    print(f"**MIDI синтезатор, версия {APP_VERSION}**")
+    print(f"{colorize('MIDI синтезатор', ANSI_YELLOW)}, версия {APP_VERSION}")
     engine = build_engine(args, output_name)
     favorites = load_favorites(favorites_path)
     last_favorite_index: Optional[int] = None
@@ -1077,9 +1077,14 @@ def run(args: argparse.Namespace) -> None:
                             last_favorite_index,
                         )
                         save_favorites(favorites_path, favorites)
-                        toggle_action = "добавлена в" if added else "удалена из"
+                        toggle_action = (
+                            "добавлена в избранные"
+                            if added
+                            else "удалена из избранных"
+                        )
                         print(
-                            f"[favorites] program={current_program} {toggle_action} избранных"
+                            f"[favorites] program={format_program_with_name(current_program, bank=0)} "
+                            f"{toggle_action}"
                         )
                         continue
 
