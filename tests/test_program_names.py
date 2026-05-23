@@ -146,6 +146,15 @@ class ProgramNameFormattingTests(unittest.TestCase):
             ),
         )
 
+    def test_initialize_channel_defaults_applies_to_all_channels(self) -> None:
+        state = main.build_channel_instrument_state()
+        main.initialize_channel_defaults(state, bank=257, program=130)
+
+        for channel in range(16):
+            self.assertEqual(state[channel]["bank_msb"], 2)
+            self.assertEqual(state[channel]["bank_lsb"], 1)
+            self.assertEqual(state[channel]["program"], 2)
+
 
 if __name__ == "__main__":
     unittest.main()

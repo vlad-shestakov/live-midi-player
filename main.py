@@ -886,6 +886,20 @@ def build_channel_instrument_state() -> dict[int, dict[str, Optional[int]]]:
     }
 
 
+def initialize_channel_defaults(
+    state: dict[int, dict[str, Optional[int]]],
+    bank: int,
+    program: int,
+) -> None:
+    bank_msb = (bank >> 7) & 0x7F
+    bank_lsb = bank & 0x7F
+    initial_program = wrap_program(program)
+    for channel_state in state.values():
+        channel_state["bank_msb"] = bank_msb
+        channel_state["bank_lsb"] = bank_lsb
+        channel_state["program"] = initial_program
+
+
 def current_bank_value(channel_state: dict[str, Optional[int]]) -> int:
     bank_msb = channel_state.get("bank_msb") or 0
     bank_lsb = channel_state.get("bank_lsb") or 0
@@ -1008,10 +1022,7 @@ def run(args: argparse.Namespace) -> None:
     favorites = load_favorites(favorites_path)
     last_favorite_index: Optional[int] = None
     channel_state = build_channel_instrument_state()
-    default_state = channel_state[args.channel]
-    default_state["bank_msb"] = (args.bank >> 7) & 0x7F
-    default_state["bank_lsb"] = args.bank & 0x7F
-    default_state["program"] = wrap_program(args.program)
+    initialize_channel_defaults(channel_state, args.bank, args.program)
     program_controller = ProgramController(engine, channel_state, args.channel)
 
     print(f"Вход: {input_name}")
