@@ -603,7 +603,7 @@ def favorite_hotkey_label(position: int) -> Optional[str]:
 
 
 def print_favorites(programs: list[int]) -> None:
-    favorites_title = colorize("Избранные программы", ANSI_YELLOW)
+    favorites_title = colorize("Избранные инструменты", ANSI_YELLOW)
     if not programs:
         print(f"{favorites_title}: <пусто>")
         return
@@ -618,15 +618,15 @@ def print_favorites(programs: list[int]) -> None:
     print()
     print(
         f"  {colorize('*', ANSI_BLUE)}       : "
-        "Добавить/удалить текущую программу в избранном"
+        "Добавить/удалить текущий инструмент в избранном"
     )
     print(
         f"  {colorize('PgUp', ANSI_BLUE)}    : "
-        "Следующая избранная программа (по списку)"
+        "Следующий избранный инструмент (по списку)"
     )
     print(
         f"  {colorize('PgDown', ANSI_BLUE)}  : "
-        "Предыдущая избранная программа (по списку)"
+        "Предыдущий избранный инструмент (по списку)"
     )
 
 
@@ -634,13 +634,13 @@ def format_favorite_selected_message(
     program: int, selected_index: int, total_favorites: int
 ) -> str:
     return (
-        f"[favorites] выбрана программа {format_program_with_name(program, bank=0)} "
+        f"[favorites] выбран инструмент {format_program_with_name(program, bank=0)} "
         f"({selected_index}/{total_favorites})"
     )
 
 
 def format_missing_favorite_message(position: int) -> str:
-    return f"Нет избранной программы №{position}, добавьте в избранные через *"
+    return f"Нет избранного инструмента  #{position}, добавьте в избранные через *"
 
 
 def format_ready_instrument_message(channel: int, program: int, bank: int) -> str:
@@ -654,24 +654,24 @@ def print_hotkeys() -> None:
     print(colorize("Быстрые клавиши:", ANSI_YELLOW))
     print(f"  {colorize('+ или =', ANSI_BLUE)} : Program +1")
     print(f"  {colorize('- или _', ANSI_BLUE)} : Program -1")
-    print(f"  {colorize('F1..F10', ANSI_BLUE)} : Выбрать 1..10 программу из избранных")
+    print(f"  {colorize('F1..F10', ANSI_BLUE)} : Выбрать 1..10 инструмент из избранных")
     print(
         f"  {colorize('Shift+F1..Shift+F10', ANSI_BLUE)} : "
-        "Выбрать 11..20 программу из избранных"
+        "Выбрать 11..20 инструмент из избранных"
     )
     print(
         f"  {colorize('*', ANSI_BLUE)}       : "
-        "Добавить/удалить текущую программу в избранном"
+        "Добавить/удалить текущий инструмент в избранном"
     )
     print(
         f"  {colorize('PgUp', ANSI_BLUE)}    : "
-        "Следующая избранная программа (по списку)"
+        "Следующий избранный инструмент (по списку)"
     )
     print(
         f"  {colorize('PgDown', ANSI_BLUE)}  : "
-        "Предыдущая избранная программа (по списку)"
+        "Предыдущий избранный инструмент (по списку)"
     )
-    print(f"  {colorize('p/P', ANSI_BLUE)}     : Показать список избранных программ")
+    print(f"  {colorize('p/P', ANSI_BLUE)}     : Показать список избранных инструментов")
     print(f"  {colorize('h/H', ANSI_BLUE)}     : Показать список быстрых клавиш")
     print(f"  {colorize('Ctrl+C', ANSI_BLUE)}  : Остановить программу")
 
@@ -818,7 +818,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--favorites",
         default=str(default_favorites_path()),
-        help="Путь к JSON-файлу избранных программ.",
+        help="Путь к JSON-файлу избранных инструментов.",
     )
     parser.add_argument(
         "--input-port",

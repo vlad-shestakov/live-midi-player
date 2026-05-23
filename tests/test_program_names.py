@@ -60,16 +60,57 @@ class ProgramNameFormattingTests(unittest.TestCase):
         self.assertEqual(
             output.getvalue(),
             (
-                f"{main.ANSI_YELLOW}Избранные программы{main.ANSI_RESET} (8):\n"
-                f"  1. 127 ({main.ANSI_GREEN}Gunshot{main.ANSI_RESET} [GM reference])\n"
-                f"  2. 9 ({main.ANSI_GREEN}Glockenspiel{main.ANSI_RESET} [GM reference])\n"
-                f"  3. 19 ({main.ANSI_GREEN}Church Organ{main.ANSI_RESET} [GM reference])\n"
-                f"  4. 123 ({main.ANSI_GREEN}Bird Tweet{main.ANSI_RESET} [GM reference])\n"
-                f"  5. 114 ({main.ANSI_GREEN}Steel Drums{main.ANSI_RESET} [GM reference])\n"
-                f"  6. 0 ({main.ANSI_GREEN}Acoustic Grand Piano{main.ANSI_RESET} [GM reference])\n"
-                f"  7. 5 ({main.ANSI_GREEN}Electric Piano 2{main.ANSI_RESET} [GM reference])\n"
-                f"  8. 13 ({main.ANSI_GREEN}Xylophone{main.ANSI_RESET} [GM reference])\n"
+                f"{main.ANSI_YELLOW}Избранные инструменты{main.ANSI_RESET} (8):\n"
+                f"  1. {main.ANSI_BLUE}F1{main.ANSI_RESET} - "
+                f"127 ({main.ANSI_GREEN}Gunshot{main.ANSI_RESET} [GM reference])\n"
+                f"  2. {main.ANSI_BLUE}F2{main.ANSI_RESET} - "
+                f"9 ({main.ANSI_GREEN}Glockenspiel{main.ANSI_RESET} [GM reference])\n"
+                f"  3. {main.ANSI_BLUE}F3{main.ANSI_RESET} - "
+                f"19 ({main.ANSI_GREEN}Church Organ{main.ANSI_RESET} [GM reference])\n"
+                f"  4. {main.ANSI_BLUE}F4{main.ANSI_RESET} - "
+                f"123 ({main.ANSI_GREEN}Bird Tweet{main.ANSI_RESET} [GM reference])\n"
+                f"  5. {main.ANSI_BLUE}F5{main.ANSI_RESET} - "
+                f"114 ({main.ANSI_GREEN}Steel Drums{main.ANSI_RESET} [GM reference])\n"
+                f"  6. {main.ANSI_BLUE}F6{main.ANSI_RESET} - "
+                f"0 ({main.ANSI_GREEN}Acoustic Grand Piano{main.ANSI_RESET} [GM reference])\n"
+                f"  7. {main.ANSI_BLUE}F7{main.ANSI_RESET} - "
+                f"5 ({main.ANSI_GREEN}Electric Piano 2{main.ANSI_RESET} [GM reference])\n"
+                f"  8. {main.ANSI_BLUE}F8{main.ANSI_RESET} - "
+                f"13 ({main.ANSI_GREEN}Xylophone{main.ANSI_RESET} [GM reference])\n"
+                "\n"
+                f"  {main.ANSI_BLUE}*{main.ANSI_RESET}       : "
+                "Добавить/удалить текущую программу в избранном\n"
+                f"  {main.ANSI_BLUE}PgUp{main.ANSI_RESET}    : "
+                "Следующая избранная программа (по списку)\n"
+                f"  {main.ANSI_BLUE}PgDown{main.ANSI_RESET}  : "
+                "Предыдущая избранная программа (по списку)\n"
             ),
+        )
+
+    def test_print_favorites_uses_shift_hotkeys_and_omits_hotkeys_after_twenty(self) -> None:
+        output = StringIO()
+        with redirect_stdout(output):
+            main.print_favorites([111] * 22)
+
+        rendered = output.getvalue()
+        rendered_program = main.format_program_with_name(111, bank=0)
+        self.assertIn(
+            f"  19. {main.ANSI_BLUE}Shift-F9{main.ANSI_RESET} - "
+            f"{rendered_program}\n",
+            rendered,
+        )
+        self.assertIn(
+            f"  20. {main.ANSI_BLUE}Shift-F10{main.ANSI_RESET} - "
+            f"{rendered_program}\n",
+            rendered,
+        )
+        self.assertIn(
+            f"  21. {rendered_program}\n",
+            rendered,
+        )
+        self.assertIn(
+            f"  22. {rendered_program}\n",
+            rendered,
         )
 
     def test_set_program_log_shows_name_only_for_new_program(self) -> None:
