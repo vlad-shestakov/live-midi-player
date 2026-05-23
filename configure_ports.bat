@@ -124,7 +124,7 @@ goto end
 :select_port_by_number
 set "PORT_KIND=%~1"
 set "PORT_COUNT=0"
-for /f "tokens=1 delims==" %%V in ('set PORT_ 2^>nul') do set "%%V="
+for /f "tokens=1 delims==" %%V in ('set PORT_ITEM_ 2^>nul') do set "%%V="
 
 if /I "%PORT_KIND%"=="input" (
     set "PORT_LABEL=входных"
@@ -132,16 +132,15 @@ if /I "%PORT_KIND%"=="input" (
     set "PORT_LABEL=выходных"
 )
 
-for /f "usebackq delims=" %%L in (`"%PYTHON_EXE%" main.py --list-ports-json --ports-kind "!PORT_KIND!"`) do (
+for /f "usebackq delims=" %%L in (`"%PYTHON_EXE%" main.py --list-ports-json --ports-kind !PORT_KIND!`) do (
     set "ENTRY=%%L"
     for /f "tokens=* delims= " %%A in ("!ENTRY!") do set "ENTRY=%%A"
     if not "!ENTRY!"=="[" if not "!ENTRY!"=="]" (
         if "!ENTRY:~-1!"=="," set "ENTRY=!ENTRY:~0,-1!"
-        if "!ENTRY:~0,1!"=="^"" set "ENTRY=!ENTRY:~1!"
-        if "!ENTRY:~-1!"=="^"" set "ENTRY=!ENTRY:~0,-1!"
+        set "ENTRY=!ENTRY:"=!"
         if defined ENTRY (
             set /a PORT_COUNT+=1
-            set "PORT_!PORT_COUNT!=!ENTRY!"
+            set "PORT_ITEM_!PORT_COUNT!=!ENTRY!"
         )
     )
 )
@@ -152,7 +151,7 @@ if !PORT_COUNT! LEQ 0 (
 )
 
 echo Доступные !PORT_LABEL! MIDI-порты:
-for /L %%I in (1,1,!PORT_COUNT!) do echo   %%I. !PORT_%%I!
+for /L %%I in (1,1,!PORT_COUNT!) do echo   %%I. !PORT_ITEM_%%I!
 echo.
 
 :select_port_retry
@@ -164,7 +163,7 @@ if not defined PORT_INDEX (
     goto select_port_retry
 )
 
-echo(!PORT_INDEX! | findstr /R "^[1-9][0-9]*$" >nul
+echo(!PORT_INDEX!| findstr /R "^[1-9][0-9]*$" >nul
 if errorlevel 1 (
     echo Введите число от 1 до !PORT_COUNT!.
     goto select_port_retry
@@ -175,7 +174,7 @@ if !PORT_INDEX! GTR !PORT_COUNT! (
     goto select_port_retry
 )
 
-for %%I in (!PORT_INDEX!) do set "SELECTED_PORT=!PORT_%%I!"
+for %%I in (!PORT_INDEX!) do set "SELECTED_PORT=!PORT_ITEM_%%I!"
 set "%~2=!SELECTED_PORT!"
 exit /b 0
 
