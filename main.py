@@ -8,7 +8,91 @@ from typing import Iterable, Optional
 
 import mido
 
+try:
+    import msvcrt
+except ImportError:
+    msvcrt = None
+
 CONFIG_FILENAME = "midi_ports.json"
+PROGRAM_RANGE = 128
+
+
+def wrap_program(program: int) -> int:
+    return program % PROGRAM_RANGE
+
+
+class ProgramController:
+    def __init__(
+        self,
+        engine: "AudioEngine",
+        state: dict[int, dict[str, Optional[int]]],
+        default_channel: int,
+    ):
+        self._engine = engine
+        self._state = state
+        self._default_channel = default_channel
+        self.last_active_channel = default_channel
+
+    def _ensure_channel_state(self, channel: int) -> dict[str, Optional[int]]:
+        return self._state.setdefault(
+            channel,
+            {"bank_msb": 0, "bank_lsb": 0, "program": None},
+        )
+
+    def _current_program(self, channel_state: dict[str, Optional[int]]) -> int:
+        program = channel_state.get("program")
+        if isinstance(program, int):
+            return wrap_program(program)
+        return 0
+
+    def sync_from_message(self, msg: mido.Message) -> None:
+        channel = getattr(msg, "channel", self._default_channel)
+        channel_state = self._ensure_channel_state(channel)
+
+        if hasattr(msg, "channel"):
+            self.last_active_channel = channel
+
+        if msg.type == "control_change":
+            if msg.control == 0:
+                channel_state["bank_msb"] = msg.value
+            elif msg.control == 32:
+                channel_state["bank_lsb"] = msg.value
+            return
+
+        if msg.type == "program_change":
+            channel_state["program"] = wrap_program(msg.program)
+
+    def change_program(self, step: int, source: str, channel: Optional[int] = None) -> None:
+        target_channel = self.last_active_channel if channel is None else channel
+        channel_state = self._ensure_channel_state(target_channel)
+        old_program = self._current_program(channel_state)
+        new_program = wrap_program(old_program + step)
+        channel_state["program"] = new_program
+        self._engine.program_change(new_program, target_channel)
+        print(
+            f"[instrument] source={source} ch={target_channel + 1} "
+            f"program={old_program}->{new_program} "
+            f"bank={current_bank_value(channel_state)} "
+            f"(cc0={channel_state['bank_msb']}, cc32={channel_state['bank_lsb']})"
+        )
+
+
+def poll_program_step_from_keyboard() -> int:
+    if msvcrt is None:
+        return 0
+
+    step = 0
+    while msvcrt.kbhit():
+        key = msvcrt.getwch()
+        if key in ("\x00", "\xe0"):
+            if msvcrt.kbhit():
+                msvcrt.getwch()
+            continue
+        if key in ("+", "="):
+            step += 1
+        elif key in ("-", "_"):
+            step -= 1
+    return step
 
 
 class AudioEngine:
@@ -307,6 +391,18 @@ def parse_args() -> argparse.Namespace:
         "--verbose", action="store_true", help="Печатать входящие MIDI-сообщения."
     )
     parser.add_argument(
+        "--program-up-cc",
+        type=int,
+        default=None,
+        help="CC (0-127), который переключает program на +1 для текущего канала.",
+    )
+    parser.add_argument(
+        "--program-down-cc",
+        type=int,
+        default=None,
+        help="CC (0-127), который переключает program на -1 для текущего канала.",
+    )
+    parser.add_argument(
         "--save-ports",
         action="store_true",
         help="Сохранить выбранные входной/выходной порты в конфигурацию перед запуском.",
@@ -397,6 +493,21 @@ def handle_message(msg: mido.Message, engine: AudioEngine, default_channel: int)
     engine.forward_message(msg)
 
 
+def midi_program_step_from_trigger(
+    msg: mido.Message,
+    up_cc: Optional[int],
+    down_cc: Optional[int],
+) -> int:
+    if msg.type != "control_change" or msg.value == 0:
+        return 0
+
+    if up_cc is not None and msg.control == up_cc:
+        return 1
+    if down_cc is not None and msg.control == down_cc:
+        return -1
+    return 0
+
+
 def build_channel_instrument_state() -> dict[int, dict[str, Optional[int]]]:
     return {
         channel: {"bank_msb": 0, "bank_lsb": 0, "program": None}
@@ -473,6 +584,16 @@ def run(args: argparse.Namespace) -> None:
 
     if not 0 <= args.channel <= 15:
         raise RuntimeError("--channel должен быть в диапазоне 0..15")
+    if args.program_up_cc is not None and not 0 <= args.program_up_cc <= 127:
+        raise RuntimeError("--program-up-cc должен быть в диапазоне 0..127")
+    if args.program_down_cc is not None and not 0 <= args.program_down_cc <= 127:
+        raise RuntimeError("--program-down-cc должен быть в диапазоне 0..127")
+    if (
+        args.program_up_cc is not None
+        and args.program_down_cc is not None
+        and args.program_up_cc == args.program_down_cc
+    ):
+        raise RuntimeError("--program-up-cc и --program-down-cc не должны совпадать")
 
     config = load_port_config(config_path)
     input_names = list(mido.get_input_names())
@@ -506,11 +627,18 @@ def run(args: argparse.Namespace) -> None:
     default_state = channel_state[args.channel]
     default_state["bank_msb"] = (args.bank >> 7) & 0x7F
     default_state["bank_lsb"] = args.bank & 0x7F
-    default_state["program"] = args.program
+    default_state["program"] = wrap_program(args.program)
+    program_controller = ProgramController(engine, channel_state, args.channel)
 
     print(f"Вход: {input_name}")
     if output_name:
         print(f"Выход: {output_name}")
+    if args.program_up_cc is not None or args.program_down_cc is not None:
+        print(
+            "MIDI-триггеры program: "
+            f"up_cc={args.program_up_cc if args.program_up_cc is not None else '-'} "
+            f"down_cc={args.program_down_cc if args.program_down_cc is not None else '-'}"
+        )
     print(
         "Рекомендуемая аудиоконфигурация: ASIO или WASAPI exclusive, "
         "буфер 64-128 сэмплов, частота 48000 Гц."
@@ -519,6 +647,7 @@ def run(args: argparse.Namespace) -> None:
         f"Целевые параметры: buffer={args.buffer} сэмплов, "
         f"latency<={args.latency_target_ms:.1f} мс."
     )
+    print("Горячие клавиши: '+' или '=' для Program +1, '-' или '_' для Program -1.")
     print("Прослушивание MIDI... Нажмите Ctrl+C для остановки.")
 
     try:
@@ -527,11 +656,32 @@ def run(args: argparse.Namespace) -> None:
                 handled_any = False
                 for msg in midi_in.iter_pending():
                     handled_any = True
+                    program_controller.sync_from_message(msg)
                     if args.verbose:
                         if msg.type != "clock":
                             print(msg)
                         log_instrument_observability(msg, args.channel, channel_state)
+                    step = midi_program_step_from_trigger(
+                        msg,
+                        args.program_up_cc,
+                        args.program_down_cc,
+                    )
+                    if step != 0:
+                        trigger_source = f"midi_cc{msg.control}"
+                        msg_channel = getattr(msg, "channel", args.channel)
+                        program_controller.change_program(
+                            step,
+                            source=trigger_source,
+                            channel=msg_channel,
+                        )
+                        continue
                     handle_message(msg, engine, args.channel)
+                keyboard_step = poll_program_step_from_keyboard()
+                if keyboard_step != 0:
+                    handled_any = True
+                    direction = 1 if keyboard_step > 0 else -1
+                    for _ in range(abs(keyboard_step)):
+                        program_controller.change_program(direction, source="keyboard")
                 if not handled_any:
                     time.sleep(0.001)
     finally:

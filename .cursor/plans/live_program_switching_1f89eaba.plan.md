@@ -4,19 +4,19 @@ overview: "Добавить в MIDI-слушатель живое переклю
 todos:
   - id: controller
     content: Добавить ProgramController для last-active channel и циклического изменения program ±1 (127->0, 0->127)
-    status: pending
+    status: completed
   - id: keyboard-input
     content: Интегрировать неблокирующий захват '+'/'-' в основном цикле run()
-    status: pending
+    status: completed
   - id: midi-triggers
     content: Добавить MIDI-триггеры program up/down через control_change и связать с ProgramController
-    status: pending
+    status: completed
   - id: observability
     content: Добавить понятные логи источника смены и итогового program/channel
-    status: pending
+    status: completed
   - id: smoke-test
     content: Проверить сценарии keyboard + MIDI trigger + обычный program_change
-    status: pending
+    status: completed
 isProject: false
 ---
 
