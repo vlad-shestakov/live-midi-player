@@ -422,11 +422,15 @@ def run(args: argparse.Namespace) -> None:
 
     try:
         with mido.open_input(input_name) as midi_in:
-            for msg in midi_in:
-                if args.verbose:
-                    print(msg)
-                handle_message(msg, engine, args.channel)
-                time.sleep(0.0)
+            while True:
+                handled_any = False
+                for msg in midi_in.iter_pending():
+                    handled_any = True
+                    if args.verbose:
+                        print(msg)
+                    handle_message(msg, engine, args.channel)
+                if not handled_any:
+                    time.sleep(0.001)
     finally:
         engine.close()
 
