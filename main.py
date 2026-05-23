@@ -259,8 +259,8 @@ class ProgramController:
         channel_state["program"] = new_program
         bank_msb = channel_state.get("bank_msb") or 0
         bank_lsb = channel_state.get("bank_lsb") or 0
-        self._engine.control_change(123, 0, target_channel)  # all notes off
-        self._engine.control_change(121, 0, target_channel)  # reset controllers
+        self._engine.control_change(123, 0, target_channel)  # CC 123: отключить все ноты
+        self._engine.control_change(121, 0, target_channel)  # CC 121: сбросить контроллеры
         self._engine.control_change(0, bank_msb, target_channel)
         self._engine.control_change(32, bank_lsb, target_channel)
         self._engine.program_change(new_program, target_channel)
@@ -414,7 +414,7 @@ class FluidSynthEngine(AudioEngine):
         self._synth.cc(channel, control, value)
 
     def pitch_bend(self, pitch: int, channel: int) -> None:
-        # Mido pitchwheel range is [-8192, 8191], FluidSynth expects [0, 16383].
+        # Диапазон pitchwheel в Mido: [-8192, 8191], а FluidSynth ожидает [0, 16383].
         bend_value = max(0, min(16383, pitch + 8192))
         self._synth.pitch_bend(channel, bend_value)
 
@@ -843,7 +843,7 @@ def build_engine(args: argparse.Namespace, output_name: Optional[str]) -> AudioE
 
 
 def handle_message(msg: mido.Message, engine: AudioEngine, default_channel: int) -> None:
-    # Keep output channel stable regardless of incoming controller channel.
+    # Держим стабильный выходной канал независимо от входящего канала контроллера.
     channel = default_channel
 
     if msg.type == "note_on":
@@ -869,7 +869,7 @@ def handle_message(msg: mido.Message, engine: AudioEngine, default_channel: int)
         engine.program_change(msg.program, channel)
         return
 
-    # Forward unsupported message types for midi-through workflow.
+    # Пробрасываем неподдержанные типы сообщений для сценария MIDI-through.
     engine.forward_message(msg)
 
 
@@ -953,7 +953,7 @@ def log_instrument_observability(
         return
 
     if msg.type == "note_on" and msg.velocity > 0:
-        # Reflect actual synth output channel (same routing as handle_message).
+        # Отражаем фактический выходной канал синтеза (та же маршрутизация, что в handle_message).
         observed_channel = default_channel
         observed_state = state.setdefault(
             observed_channel,

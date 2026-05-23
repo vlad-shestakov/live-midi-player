@@ -3,7 +3,7 @@ import types
 import unittest
 
 
-# Avoid dependency on real MIDI packages/devices during test import.
+# Убираем зависимость от реальных MIDI-пакетов и устройств при импорте тестов.
 if "mido" not in sys.modules:
     sys.modules["mido"] = types.SimpleNamespace(Message=object)
 
@@ -29,7 +29,7 @@ class FavoritesLogicTests(unittest.TestCase):
 
     def test_toggle_remove_adjusts_cursor_when_needed(self) -> None:
         favorites = [1, 23, 12, 125]
-        # Cursor points to 12 (index 2), remove 23 (index 1) -> cursor shifts to 1.
+        # Курсор указывает на 12 (индекс 2); удаляем 23 (индекс 1) и сдвигаем курсор на 1.
         added, cursor = main.toggle_favorite(favorites, 23, 2)
 
         self.assertFalse(added)

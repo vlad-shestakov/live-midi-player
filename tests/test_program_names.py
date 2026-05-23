@@ -5,7 +5,7 @@ from contextlib import redirect_stdout
 from io import StringIO
 
 
-# Avoid dependency on real MIDI packages/devices during test import.
+# Убираем зависимость от реальных MIDI-пакетов и устройств при импорте тестов.
 if "mido" not in sys.modules:
     sys.modules["mido"] = types.SimpleNamespace(Message=object)
 
