@@ -98,6 +98,16 @@ class ProgramNameFormattingTests(unittest.TestCase):
             ),
         )
 
+    def test_format_ready_instrument_message_includes_program_name(self) -> None:
+        self.assertEqual(
+            main.format_ready_instrument_message(channel=0, program=5, bank=0),
+            (
+                "Готов к игре: ch=1 "
+                f"program=5 ({main.ANSI_GREEN}Electric Piano 2{main.ANSI_RESET} "
+                "[GM reference]) bank=0"
+            ),
+        )
+
     def test_print_hotkeys_uses_colored_header_and_shortcuts(self) -> None:
         output = StringIO()
         with redirect_stdout(output):

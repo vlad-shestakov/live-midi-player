@@ -547,6 +547,13 @@ def format_favorite_selected_message(
     )
 
 
+def format_ready_instrument_message(channel: int, program: int, bank: int) -> str:
+    return (
+        f"Готов к игре: ch={channel + 1} "
+        f"program={format_program_with_name(program, bank)} bank={bank}"
+    )
+
+
 def print_hotkeys() -> None:
     print(colorize("Быстрые клавиши:", ANSI_YELLOW))
     print(f"  {colorize('+ или =', ANSI_BLUE)} : Program +1")
@@ -1031,6 +1038,13 @@ def run(args: argparse.Namespace) -> None:
         f"{colorize('PgUp/PgDown', ANSI_BLUE)} выбор по избранным, "
         f"{colorize('p/P', ANSI_BLUE)} список избранных, "
         f"{colorize('h/H', ANSI_BLUE)} помощь."
+    )
+    print(
+        format_ready_instrument_message(
+            args.channel,
+            wrap_program(args.program),
+            args.bank,
+        )
     )
     print(f"Файл избранных: {favorites_path} (загружено: {len(favorites)})")
     print(f"Прослушивание MIDI... Нажмите {colorize('Ctrl+C', ANSI_BLUE)} для остановки.")
