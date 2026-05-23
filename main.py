@@ -14,12 +14,13 @@ try:
 except ImportError:
     msvcrt = None
 
+APP_VERSION = "1.04 (23.05.2026)"
+
 CONFIG_FILENAME = "midi_ports.json"
 FAVORITES_FILENAME = "midi_favorites.json"
 PROGRAM_RANGE = 128
 PENDING_EXTENDED_KEY = False
 GM_REFERENCE_TAG = "[GM reference]"
-APP_VERSION = "1.03 (23.05.2026)"
 ANSI_RESET = "\033[0m"
 ANSI_GREEN = "\033[32m"
 ANSI_YELLOW = "\033[33m"
@@ -303,6 +304,21 @@ def poll_keyboard_actions() -> list[KeyboardAction]:
             actions.append(KeyboardAction(kind="print_favorites"))
         elif key in ("h", "H", "р", "Р"):
             actions.append(KeyboardAction(kind="print_help"))
+    if actions:
+        has_plain_action = any(
+            action.kind
+            in ("program_step", "favorite_toggle", "print_favorites", "print_help")
+            for action in actions
+        )
+        has_favorite_nav = any(
+            action.kind in ("favorite_prev", "favorite_next") for action in actions
+        )
+        if has_plain_action and has_favorite_nav:
+            actions = [
+                action
+                for action in actions
+                if action.kind not in ("favorite_prev", "favorite_next")
+            ]
     return actions
 
 
@@ -1091,11 +1107,18 @@ def run(args: argparse.Namespace) -> None:
                     handled_any = True
                 for action in keyboard_actions:
                     if action.kind == "program_step" and action.step != 0:
-                        program_controller.change_program(action.step, source="keyboard")
+                        program_controller.change_program(
+                            action.step,
+                            source="keyboard",
+                            channel=args.channel,
+                        )
                         continue
 
                     if action.kind == "favorite_toggle":
-                        current_program = program_controller.current_program()
+                        keyboard_channel = args.channel
+                        current_program = program_controller.current_program(
+                            channel=keyboard_channel
+                        )
                         added, last_favorite_index = toggle_favorite(
                             favorites,
                             current_program,
@@ -1117,7 +1140,10 @@ def run(args: argparse.Namespace) -> None:
                         if not favorites:
                             print("Нет избранных, добавьте в избранные через *")
                             continue
-                        current_program = program_controller.current_program()
+                        keyboard_channel = args.channel
+                        current_program = program_controller.current_program(
+                            channel=keyboard_channel
+                        )
                         if action.kind == "favorite_prev":
                             favorite_program, last_favorite_index = favorite_prev(
                                 favorites,
@@ -1135,6 +1161,7 @@ def run(args: argparse.Namespace) -> None:
                         program_controller.set_program(
                             favorite_program,
                             source=source,
+                            channel=keyboard_channel,
                         )
                         print(
                             format_favorite_selected_message(
