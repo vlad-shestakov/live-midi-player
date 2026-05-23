@@ -83,6 +83,12 @@ class ProgramNameFormattingTests(unittest.TestCase):
         )
         self.assertNotIn("Harpsichord", rendered)
 
+    def test_format_favorite_selected_message_includes_full_name(self) -> None:
+        self.assertEqual(
+            main.format_favorite_selected_message(9, selected_index=2, total_favorites=8),
+            "[favorites] выбрана программа 9 (Glockenspiel [GM reference]) (2/8)",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

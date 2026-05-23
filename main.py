@@ -523,6 +523,15 @@ def print_favorites(programs: list[int]) -> None:
         print(f"  {index}. {format_program_with_name(program, bank=0)}")
 
 
+def format_favorite_selected_message(
+    program: int, selected_index: int, total_favorites: int
+) -> str:
+    return (
+        f"[favorites] выбрана программа {format_program_with_name(program, bank=0)} "
+        f"({selected_index}/{total_favorites})"
+    )
+
+
 def print_hotkeys() -> None:
     print("Быстрые клавиши:")
     print("  + или = : Program +1")
@@ -1068,8 +1077,11 @@ def run(args: argparse.Namespace) -> None:
                             source=source,
                         )
                         print(
-                            f"[favorites] выбрана программа {favorite_program} "
-                            f"({last_favorite_index + 1}/{len(favorites)})"
+                            format_favorite_selected_message(
+                                favorite_program,
+                                last_favorite_index + 1,
+                                len(favorites),
+                            )
                         )
                         continue
 
