@@ -397,6 +397,61 @@ def handle_message(msg: mido.Message, engine: AudioEngine, default_channel: int)
     engine.forward_message(msg)
 
 
+def build_channel_instrument_state() -> dict[int, dict[str, Optional[int]]]:
+    return {
+        channel: {"bank_msb": 0, "bank_lsb": 0, "program": None}
+        for channel in range(16)
+    }
+
+
+def current_bank_value(channel_state: dict[str, Optional[int]]) -> int:
+    bank_msb = channel_state.get("bank_msb") or 0
+    bank_lsb = channel_state.get("bank_lsb") or 0
+    return (bank_msb << 7) + bank_lsb
+
+
+def log_instrument_observability(
+    msg: mido.Message,
+    default_channel: int,
+    state: dict[int, dict[str, Optional[int]]],
+) -> None:
+    channel = getattr(msg, "channel", default_channel)
+    channel_state = state.setdefault(
+        channel,
+        {"bank_msb": 0, "bank_lsb": 0, "program": None},
+    )
+
+    if msg.type == "control_change" and msg.control in (0, 32):
+        if msg.control == 0:
+            channel_state["bank_msb"] = msg.value
+            print(
+                f"[instrument] ch={channel + 1} cc0(bank_msb)={msg.value} "
+                f"bank={current_bank_value(channel_state)}"
+            )
+            return
+        channel_state["bank_lsb"] = msg.value
+        print(
+            f"[instrument] ch={channel + 1} cc32(bank_lsb)={msg.value} "
+            f"bank={current_bank_value(channel_state)}"
+        )
+        return
+
+    if msg.type == "program_change":
+        channel_state["program"] = msg.program
+        print(
+            f"[instrument] ch={channel + 1} program={msg.program} "
+            f"bank={current_bank_value(channel_state)} "
+            f"(cc0={channel_state['bank_msb']}, cc32={channel_state['bank_lsb']})"
+        )
+        return
+
+    if msg.type == "note_on" and msg.velocity > 0:
+        print(
+            f"[play] ch={channel + 1} note={msg.note} vel={msg.velocity} "
+            f"program={channel_state['program']} bank={current_bank_value(channel_state)}"
+        )
+
+
 def run(args: argparse.Namespace) -> None:
     config_path = Path(args.config)
 
@@ -447,6 +502,11 @@ def run(args: argparse.Namespace) -> None:
         print(f"Выбранные порты сохранены в {config_path}")
 
     engine = build_engine(args, output_name)
+    channel_state = build_channel_instrument_state()
+    default_state = channel_state[args.channel]
+    default_state["bank_msb"] = (args.bank >> 7) & 0x7F
+    default_state["bank_lsb"] = args.bank & 0x7F
+    default_state["program"] = args.program
 
     print(f"Вход: {input_name}")
     if output_name:
@@ -469,6 +529,7 @@ def run(args: argparse.Namespace) -> None:
                     handled_any = True
                     if args.verbose:
                         print(msg)
+                        log_instrument_observability(msg, args.channel, channel_state)
                     handle_message(msg, engine, args.channel)
                 if not handled_any:
                     time.sleep(0.001)

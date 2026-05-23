@@ -132,6 +132,38 @@ Standalone через FluidSynth:
 python main.py --engine fluidsynth --soundfont "D:\SoundFonts\piano.sf2" --audio-driver wasapi --sample-rate 48000 --buffer 64
 ```
 
+## Проверка гипотезы: mido + python-rtmidi (live)
+
+Цель проверки: убедиться, что смена инструмента (`program_change`) действительно применяется в живом потоке и слышимо меняет тембр на стороне внешнего синта/DAW.
+
+1. Запусти слушатель в verbose-режиме:
+
+```bat
+python main.py --engine midi-out --verbose
+```
+
+2. В DAW/контроллере отправь в одном сеансе:
+   - `program_change` для Piano (например, program `0`);
+   - сыграй несколько нот;
+   - `program_change` для Organ (например, program `16`);
+   - снова сыграй несколько нот;
+   - `program_change` для Strings (например, program `48`);
+   - снова сыграй несколько нот.
+
+3. Если устройство использует Bank Select, отправляй последовательность:
+   - `CC0` (Bank MSB) -> `CC32` (Bank LSB) -> `ProgramChange`.
+
+Ожидаемые признаки в консоли:
+- строки `[instrument] ... cc0/cc32 ...` при смене банка;
+- строка `[instrument] ... program=... bank=...` при смене программы;
+- строки `[play] ... program=... bank=...` на входящих `note_on`, чтобы сопоставить игру с активным тембром.
+
+Критерий успеха:
+- логи фиксируют смену программы без ошибок;
+- тембр слышимо меняется после `program_change`.
+
+Важно: итоговый звук определяется внешним синтом/плагином (DAW/VST/устройство). `mido + python-rtmidi` только корректно передает MIDI-сообщения.
+
 ## Рекомендации по задержке
 
 - Используй ASIO или WASAPI exclusive.

@@ -24,4 +24,6 @@ if x%VENV_PATH:%CURRENT_DIR%=x%VENV_PATH%==x (
 ) 
 
 :: Запускаем сервер
-python "main.py"
+@REM python "main.py"
+@REM python "main.py" --engine midi-out --verbose
+python main.py --engine midi-out --verbose

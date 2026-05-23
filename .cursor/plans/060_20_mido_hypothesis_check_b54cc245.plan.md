@@ -4,16 +4,16 @@ overview: "Проверить гипотезу для ветки `mido + python-
 todos:
   - id: define-live-hypothesis-scenario
     content: Определить единый reproducible сценарий live-проверки смены инструмента для ветки midi-out.
-    status: pending
+    status: completed
   - id: harden-program-change-observability
     content: Уточнить наблюдаемость/логи смены банка и программы в listening mode.
-    status: pending
+    status: completed
   - id: execute-manual-playthrough
     content: Провести ручной прогон с реальной игрой и несколькими программами в одном сеансе.
-    status: pending
+    status: completed
   - id: document-hypothesis-result
     content: Обновить README кратким чеклистом и ожидаемыми признаками успешной проверки.
-    status: pending
+    status: completed
 isProject: false
 ---
 
