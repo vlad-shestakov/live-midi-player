@@ -443,6 +443,8 @@ class FluidSynthEngine(AudioEngine):
         program: int,
         sample_rate: int,
         audio_driver: Optional[str],
+        period_size: int = 64,
+        periods: int = 2,
     ):
         try:
             import fluidsynth
@@ -453,6 +455,8 @@ class FluidSynthEngine(AudioEngine):
             ) from exc
 
         self._synth = fluidsynth.Synth(samplerate=sample_rate)
+        self._synth.setting("audio.period-size", period_size)
+        self._synth.setting("audio.periods", periods)
         if audio_driver:
             self._synth.start(driver=audio_driver)
         else:
@@ -851,7 +855,13 @@ def parse_args() -> argparse.Namespace:
         "--buffer",
         type=int,
         default=64,
-        help="Целевой аудиобуфер в сэмплах (информационно). Рекомендуется: 64-128.",
+        help="Размер аудиобуфера FluidSynth в сэмплах. Рекомендуется: 64-128.",
+    )
+    parser.add_argument(
+        "--audio-periods",
+        type=int,
+        default=2,
+        help="Количество аудиопериодов FluidSynth (2 = минимальная задержка, 3 = стабильнее).",
     )
     parser.add_argument(
         "--latency-target-ms",
@@ -932,6 +942,8 @@ def build_engine(args: argparse.Namespace, output_name: Optional[str]) -> AudioE
         program=args.program,
         sample_rate=args.sample_rate,
         audio_driver=args.audio_driver,
+        period_size=args.buffer,
+        periods=args.audio_periods,
     )
 
 
@@ -1145,7 +1157,7 @@ def run(args: argparse.Namespace) -> None:
         "буфер 64-128 сэмплов, частота 48000 Гц."
     )
     print(
-        f"Целевые параметры: buffer={args.buffer} сэмплов, "
+        f"Целевые параметры: buffer={args.buffer} сэмплов × {args.audio_periods} периодов, "
         f"latency<={args.latency_target_ms:.1f} мс."
     )
     print(
@@ -1294,8 +1306,8 @@ def run(args: argparse.Namespace) -> None:
 
                     if action.kind == "print_help":
                         print_hotkeys()
-                if not handled_any:
-                    time.sleep(0.001)
+                # if not handled_any:
+                #     time.sleep(0.001)
     finally:
         engine.close()
 
